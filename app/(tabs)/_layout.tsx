@@ -3,10 +3,18 @@ import { useAuth } from "@/context/AuthContext";
 import { Redirect, Tabs } from "expo-router";
 
 export default function TabsLayout() {
-  const { user } = useAuth();
+  const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth();
 
   if (!user) {
     return <Redirect href="/" />;
+  }
+
+  if (!isOnboardingReady) {
+    return null;
+  }
+
+  if (!hasCompletedOnboarding) {
+    return <Redirect href="/onboarding" />;
   }
 
   return (

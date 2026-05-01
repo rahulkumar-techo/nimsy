@@ -1,9 +1,3 @@
-/**
- * UserAuth Screen (Final Clean Version)
- * - Centered layout
- * - Branding
- * - Google login
- */
 
 import { useEffect, useState } from "react"
 import { View, Text, Pressable, ActivityIndicator, Image } from "react-native"
