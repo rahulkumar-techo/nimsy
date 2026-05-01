@@ -1,132 +1,87 @@
-import { useAuth } from "@/context/AuthContext";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+/**
+ * Home Screen (NativeWind Version)
+ * Tailwind-based styling
+ */
+
+import { useAuth } from "@/context/AuthContext"
+import { GoogleSignin } from "@react-native-google-signin/google-signin"
+import { Image, Pressable, Text, View } from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth()
 
   const handleLogout = async () => {
     try {
-      await GoogleSignin.signOut();
+      await GoogleSignin.signOut()
     } catch (error) {
-      console.log("Logout failed", error);
+      console.log("Logout failed", error)
     } finally {
-      logout();
+      logout()
     }
-  };
+  }
 
-  const initials = user?.name?.trim().charAt(0).toUpperCase() ?? "N";
+  const initials = user?.name?.trim().charAt(0).toUpperCase() ?? "N"
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.hero}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+    <SafeAreaView className="flex-1 bg-blue-50">
+      <View className="flex-1 px-6 pt-8 gap-5">
+
+        {/* Hero Section */}
+        <View className="rounded-3xl bg-blue-700 p-6 gap-5">
+
+          {/* Avatar */}
+          <View className="h-[68px] w-[68px] rounded-full items-center justify-center bg-white/20 overflow-hidden">
+            {user?.photo ? (
+              <Image
+                source={{ uri: user.photo }} // ✅ FIXED (not src)
+                className="h-full w-full"
+              />
+            ) : (
+              <Text className="text-white text-[26px] font-extrabold">
+                {initials}
+              </Text>
+            )}
           </View>
 
-          <View style={styles.copyBlock}>
-            <Text style={styles.eyebrow}>Signed in</Text>
-            <Text style={styles.title}>Hi, {user?.name ?? "there"}</Text>
-            <Text style={styles.subtitle}>
+          {/* Text Content */}
+          <View className="gap-2">
+            <Text className="text-blue-200 text-[13px] font-bold uppercase tracking-wide">
+              Signed in
+            </Text>
+
+            <Text className="text-white text-[28px] font-extrabold">
+              Hi, {user?.name ?? "there"}
+            </Text>
+
+            <Text className="text-blue-100 text-[15px] leading-6">
               Your tab navigation is active and your home screen is now routed
-              through the shared `screens/home.tsx` component.
+              through the shared screens/home.tsx component.
             </Text>
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Email</Text>
-          <Text style={styles.cardValue}>{user?.email ?? "No email found"}</Text>
+        {/* Email Card */}
+        <View className="rounded-2xl bg-white p-5 gap-2">
+          <Text className="text-slate-500 text-[13px] font-bold uppercase tracking-wide">
+            Email
+          </Text>
+          <Text className="text-slate-900 text-[18px] font-semibold">
+            {user?.email ?? "No email found"}
+          </Text>
         </View>
 
-        <Pressable style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Log out</Text>
+        {/* Logout Button */}
+        <Pressable
+          onPress={handleLogout}
+          className="mt-auto mb-6 rounded-2xl bg-slate-900 py-4 items-center"
+        >
+          <Text className="text-white text-[16px] font-bold">
+            Log out
+          </Text>
         </Pressable>
+
       </View>
     </SafeAreaView>
-  );
+  )
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#eff6ff",
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    gap: 20,
-  },
-  hero: {
-    borderRadius: 28,
-    backgroundColor: "#1d4ed8",
-    padding: 24,
-    gap: 20,
-  },
-  avatar: {
-    height: 68,
-    width: 68,
-    borderRadius: 34,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.18)",
-  },
-  avatarText: {
-    color: "#ffffff",
-    fontSize: 26,
-    fontWeight: "800",
-  },
-  copyBlock: {
-    gap: 8,
-  },
-  eyebrow: {
-    color: "#bfdbfe",
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  title: {
-    color: "#ffffff",
-    fontSize: 28,
-    fontWeight: "800",
-  },
-  subtitle: {
-    color: "#dbeafe",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  card: {
-    borderRadius: 22,
-    backgroundColor: "#ffffff",
-    padding: 20,
-    gap: 8,
-  },
-  cardLabel: {
-    color: "#64748b",
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  cardValue: {
-    color: "#0f172a",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  logoutButton: {
-    marginTop: "auto",
-    marginBottom: 24,
-    borderRadius: 16,
-    backgroundColor: "#0f172a",
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  logoutText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-});

@@ -1,3 +1,10 @@
-import HomeScreen from "@/screens/home";
+import HomeScreen from "@/screens/home"
+import { SafeAreaView } from "react-native-safe-area-context"
 
-export default HomeScreen;
+export default function Home() {
+  return (
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <HomeScreen />
+    </SafeAreaView>
+  )
+}
