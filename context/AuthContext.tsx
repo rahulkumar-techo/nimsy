@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { GoogleSignin } from "@react-native-google-signin/google-signin"
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 
 type User = {
@@ -19,7 +20,7 @@ type AuthContextType = {
   hasCompletedOnboarding: boolean
   isOnboardingReady: boolean
   completeOnboarding: () => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -87,8 +88,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const logout = () => {
-    setUser(null)
+  const logout = async () => {
+    try {
+      const isSignedIn = await GoogleSignin.hasPreviousSignIn()
+
+      if (isSignedIn) {
+        await GoogleSignin.signOut()
+      }
+    } catch (error) {
+      console.log("Logout failed", error)
+    } finally {
+      setUser(null)
+    }
   }
 
   return (

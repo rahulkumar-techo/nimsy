@@ -3,85 +3,118 @@
  * Tailwind-based styling
  */
 
-import { useAuth } from "@/context/AuthContext"
-import { GoogleSignin } from "@react-native-google-signin/google-signin"
-import { Image, Pressable, Text, View } from "react-native"
+import React from "react"
+import NavHeader from "@/components/NavHeader"
+import { ScrollView, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import CategoryChips, { type CategoryChip } from "@/components/home-comp/CategoriesChip"
+import FeatureCarousel from "@/components/home-comp/FeatureCarousel"
+import CategorySection from "@/components/home-comp/CategorySection"
+import ContinueWatchingSection from "@/components/home-comp/ContinueWatchingSection"
+import HomeSectionContainer from "@/components/home-comp/HomeSectionContainer"
+
+const DATA = [
+  {
+    title: "The Honest Rabbit",
+    subtitle: "Daily Story",
+    image: require("../assets/branding/nimsy-logo.png"),
+  },
+  {
+    title: "Magic Forest",
+    subtitle: "Adventure",
+    image: require("../assets/branding/nimsy-logo.png"),
+  },
+]
+
+export const CHIP_DATA: CategoryChip[] = [
+  {
+    id: "stories",
+    title: "Stories",
+    icon: "book",
+  },
+  {
+    id: "videos",
+    title: "Videos",
+    icon: "play-circle",
+  },
+  {
+    id: "audio",
+    title: "Audio",
+    icon: "headset",
+  },
+  {
+    id: "favorites",
+    title: "Favorites",
+    icon: "heart",
+  },
+]
+
+
+const CATEGORY_DATA = [
+  {
+    title: "Animal",
+    subtitle: "Stories",
+    image: require("../assets/home/animals.png"),
+  },
+  {
+    title: "Moral",
+    subtitle: "Stories",
+    image: require("../assets/home/moral.png"),
+  },
+  {
+    title: "Bedtime",
+    subtitle: "Stories",
+    image: require("../assets/home/bedtime.png"),
+  },
+  {
+    title: "Learning",
+    subtitle: "Stories",
+    image: require("../assets/home/learn.png"),
+  },
+]
+const CONTINUE_DATA = [
+  {
+    id: "1",
+    title: "The Kind Elephant",
+    image: require("../assets/branding/nimsy-logo.png"),
+  },
+  {
+    id: "2",
+    title: "Brave Little Turtle",
+    image: require("../assets/branding/nimsy-logo.png"),
+  },
+]
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth()
-
-  const handleLogout = async () => {
-    try {
-      await GoogleSignin.signOut()
-    } catch (error) {
-      console.log("Logout failed", error)
-    } finally {
-      logout()
-    }
-  }
-
-  const initials = user?.name?.trim().charAt(0).toUpperCase() ?? "N"
-
   return (
-    <SafeAreaView className="flex-1 bg-blue-50">
-      <View className="flex-1 px-6 pt-8 gap-5">
+    <SafeAreaView className="flex-1 bg-blue-50" edges={["top", "left", "right"]}>
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
+      >
+        <HomeSectionContainer>
+          <NavHeader />
+        </HomeSectionContainer>
 
-        {/* Hero Section */}
-        <View className="rounded-3xl bg-blue-700 p-6 gap-5">
-
-          {/* Avatar */}
-          <View className="h-[68px] w-[68px] rounded-full items-center justify-center bg-white/20 overflow-hidden">
-            {user?.photo ? (
-              <Image
-                source={{ uri: user.photo }} // ✅ FIXED (not src)
-                className="h-full w-full"
-              />
-            ) : (
-              <Text className="text-white text-[26px] font-extrabold">
-                {initials}
-              </Text>
-            )}
-          </View>
-
-          {/* Text Content */}
-          <View className="gap-2">
-            <Text className="text-blue-200 text-[13px] font-bold uppercase tracking-wide">
-              Signed in
-            </Text>
-
-            <Text className="text-white text-[28px] font-extrabold">
-              Hi, {user?.name ?? "there"}
-            </Text>
-
-            <Text className="text-blue-100 text-[15px] leading-6">
-              Your tab navigation is active and your home screen is now routed
-              through the shared screens/home.tsx component.
-            </Text>
-          </View>
+        <View className="mt-4">
+          <FeatureCarousel data={DATA} />
         </View>
 
-        {/* Email Card */}
-        <View className="rounded-2xl bg-white p-5 gap-2">
-          <Text className="text-slate-500 text-[13px] font-bold uppercase tracking-wide">
-            Email
-          </Text>
-          <Text className="text-slate-900 text-[18px] font-semibold">
-            {user?.email ?? "No email found"}
-          </Text>
-        </View>
+        <HomeSectionContainer className="mt-8">
+          <View className="w-full gap-3">
+            <CategoryChips data={CHIP_DATA} />
+          </View>
+        </HomeSectionContainer>
 
-        {/* Logout Button */}
-        <Pressable
-          onPress={handleLogout}
-          className="mt-auto mb-6 rounded-2xl bg-slate-900 py-4 items-center"
-        >
-          <Text className="text-white text-[16px] font-bold">
-            Log out
-          </Text>
-        </Pressable>
+        <HomeSectionContainer className="mt-8">
+          <CategorySection data={CATEGORY_DATA} />
+        </HomeSectionContainer>
 
-      </View>
+        <HomeSectionContainer className="mt-8">
+          <ContinueWatchingSection data={CONTINUE_DATA} />
+        </HomeSectionContainer>
+      </ScrollView>
     </SafeAreaView>
   )
 }

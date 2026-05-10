@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { Redirect, Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
   const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth();
+  const insets = useSafeAreaInsets();
 
   if (!user) {
     return <Redirect href="/" />;
@@ -24,9 +26,9 @@ export default function TabsLayout() {
         tabBarActiveTintColor: "#2563eb",
         tabBarInactiveTintColor: "#64748b",
         tabBarStyle: {
-          height: 64,
+          height: 56 + Math.max(insets.bottom, 8),
           paddingTop: 6,
-          paddingBottom: 8,
+          paddingBottom: Math.max(insets.bottom, 8),
         },
       }}
     >
