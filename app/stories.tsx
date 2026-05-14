@@ -1,8 +1,8 @@
-import CategoryDestinationScreen from "@/screens/CategoryDestinationScreen"
+import Container from "@/components/Container";
 
 export default function StoriesRoute() {
   return (
-    <CategoryDestinationScreen
+    <Container
       title="Stories"
       subtitle="Browse story collections, continue where you left off, and discover new reads."
       icon="book"

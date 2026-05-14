@@ -1,8 +1,9 @@
-import CategoryDestinationScreen from "@/screens/CategoryDestinationScreen"
+import Container from "@/components/Container";
+
 
 export default function VideosRoute() {
   return (
-    <CategoryDestinationScreen
+    <Container
       title="Videos"
       subtitle="Open quick learning videos and watch visual lessons picked for you."
       icon="play-circle"
