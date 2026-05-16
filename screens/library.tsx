@@ -281,13 +281,6 @@ const LibraryScreen = () => {
                 </Text>
               </View>
 
-              <TouchableOpacity className="h-16 w-16 items-center justify-center rounded-full bg-violet-100">
-                <Ionicons
-                  name="search"
-                  size={30}
-                  color="#7c3aed"
-                />
-              </TouchableOpacity>
             </View>
 
             {/* TOP MENUS */}
