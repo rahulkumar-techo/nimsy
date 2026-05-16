@@ -12,6 +12,7 @@ import FeatureCarousel from "@/components/home-comp/FeatureCarousel"
 import CategorySection from "@/components/home-comp/CategorySection"
 import ContinueWatchingSection from "@/components/home-comp/ContinueWatchingSection"
 import HomeSectionContainer from "@/components/home-comp/HomeSectionContainer"
+import { categories } from "@/constants/story"
 
 const DATA = [
   {
@@ -49,29 +50,12 @@ export const CHIP_DATA: CategoryChip[] = [
   },
 ]
 
-
-const CATEGORY_DATA = [
-  {
-    title: "Animal",
-    subtitle: "Stories",
-    image: require("../assets/home/animals.png"),
-  },
-  {
-    title: "Moral",
-    subtitle: "Stories",
-    image: require("../assets/home/moral.png"),
-  },
-  {
-    title: "Bedtime",
-    subtitle: "Stories",
-    image: require("../assets/home/bedtime.png"),
-  },
-  {
-    title: "Learning",
-    subtitle: "Stories",
-    image: require("../assets/home/learn.png"),
-  },
-]
+const CATEGORY_DATA = categories.map((category) => ({
+  id: category.id,
+  title: category.title,
+  subtitle: `${category.stories.length} ${category.stories.length === 1 ? "story" : "stories"}`,
+  image: { uri: category.thumbnail },
+}))
 const CONTINUE_DATA = [
   {
     id: "1",

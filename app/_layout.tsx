@@ -1,8 +1,8 @@
 import { AuthProvider } from "@/context/AuthContext";
-import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import "../global.css"
+import "../global.css";
 
 function RootNavigator() {
   return (
@@ -12,6 +12,7 @@ function RootNavigator() {
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="category/index" />
       </Stack>
     </>
   );

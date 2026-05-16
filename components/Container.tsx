@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons"
 import { router } from "expo-router"
-import { memo } from "react"
+import { memo, type ReactNode } from "react"
 import { Pressable, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
@@ -9,6 +9,7 @@ interface ContainerProps {
   title: string
   subtitle: string
   icon: keyof typeof Ionicons.glyphMap
+  children?: ReactNode
 }
 
 const COLORS = {
@@ -32,6 +33,7 @@ const Container = memo(function Container({
   title,
   subtitle,
   icon,
+  children,
 }: ContainerProps) {
   const handleBackPress = () => {
     router.back()
@@ -70,6 +72,8 @@ const Container = memo(function Container({
           <Text className="mt-3 text-base leading-6 text-slate-500">
             {subtitle}
           </Text>
+
+          {children ? <View className="mt-6">{children}</View> : null}
         </View>
       </View>
     </SafeAreaView>
