@@ -1,0 +1,18 @@
+reviews:
+  profile: chill
+
+language: en
+
+early_access: false
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: auto
+
+tone_instructions: |
+  Review React Native and Expo code carefully.
+  Focus on performance, clean architecture,
+  TypeScript safety, and mobile-first UI.
