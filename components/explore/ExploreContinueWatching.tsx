@@ -43,6 +43,59 @@ const ExploreContinueWatching = ({
   const limitedData =
     data.slice(0, limit);
 
+  const renderItem = (item: ContinueItem) => (
+    <TouchableOpacity
+      key={item.id}
+      activeOpacity={0.9}
+      className={`overflow-hidden rounded-3xl bg-gray-100 ${
+        horizontal
+          ? "w-[280px]"
+          : "w-full"
+      }`}
+    >
+      <Image
+        source={{
+          uri: item.image,
+        }}
+        className={`w-full ${
+          horizontal
+            ? "h-48"
+            : "h-56"
+        }`}
+        resizeMode="cover"
+      />
+
+      <View className="p-4">
+        <Text
+          numberOfLines={1}
+          className="text-xl font-bold text-black"
+        >
+          {item.title}
+        </Text>
+
+        <View className="mt-2 flex-row items-center justify-between">
+          <Text className="text-gray-500">
+            {item.progress}%
+            watched
+          </Text>
+
+          <Text className="text-gray-500">
+            {item.duration}
+          </Text>
+        </View>
+
+        <View className="mt-4 h-2 overflow-hidden rounded-full bg-gray-300">
+          <View
+            style={{
+              width: `${item.progress}%`,
+            }}
+            className="h-full rounded-full bg-violet-600"
+          />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <View className="mt-10 px-5">
       {/* HEADER */}
@@ -58,82 +111,35 @@ const ExploreContinueWatching = ({
         </TouchableOpacity>
       </View>
 
-      {/* LIST */}
-      <FlatList
-        horizontal={horizontal}
-        data={limitedData}
-        keyExtractor={(item) =>
-          item.id
-        }
-        scrollEnabled={
-          scrollEnabled
-        }
-        showsHorizontalScrollIndicator={
-          false
-        }
-        showsVerticalScrollIndicator={
-          false
-        }
-        contentContainerStyle={{
-          gap: 16,
-          paddingRight:
-            horizontal ? 20 : 0,
-        }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            activeOpacity={0.9}
-            className={`overflow-hidden rounded-3xl bg-gray-100 ${
-              horizontal
-                ? "w-[280px]"
-                : "w-full"
-            }`}
-          >
-            {/* IMAGE */}
-            <Image
-              source={{
-                uri: item.image,
-              }}
-              className={`w-full ${
-                horizontal
-                  ? "h-48"
-                  : "h-56"
-              }`}
-              resizeMode="cover"
-            />
-
-            {/* CONTENT */}
-            <View className="p-4">
-              <Text
-                numberOfLines={1}
-                className="text-xl font-bold text-black"
-              >
-                {item.title}
-              </Text>
-
-              <View className="mt-2 flex-row items-center justify-between">
-                <Text className="text-gray-500">
-                  {item.progress}%
-                  watched
-                </Text>
-
-                <Text className="text-gray-500">
-                  {item.duration}
-                </Text>
-              </View>
-
-              {/* PROGRESS */}
-              <View className="mt-4 h-2 overflow-hidden rounded-full bg-gray-300">
-                <View
-                  style={{
-                    width: `${item.progress}%`,
-                  }}
-                  className="h-full rounded-full bg-violet-600"
-                />
-              </View>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
+      {horizontal ? (
+        <FlatList
+          horizontal
+          data={limitedData}
+          keyExtractor={(item) =>
+            item.id
+          }
+          scrollEnabled={
+            scrollEnabled
+          }
+          showsHorizontalScrollIndicator={
+            false
+          }
+          showsVerticalScrollIndicator={
+            false
+          }
+          contentContainerStyle={{
+            gap: 16,
+            paddingRight: 20,
+          }}
+          renderItem={({ item }) =>
+            renderItem(item)
+          }
+        />
+      ) : (
+        <View className="gap-4">
+          {limitedData.map(renderItem)}
+        </View>
+      )}
     </View>
   );
 };

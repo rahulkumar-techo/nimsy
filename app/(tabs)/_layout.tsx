@@ -1,10 +1,16 @@
+/**
+ * Bottom Tabs Layout
+ */
+
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Image } from "expo-image";
 
 export default function TabsLayout() {
   const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth();
+
   const insets = useSafeAreaInsets();
 
   if (!user) {
@@ -23,12 +29,19 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#2563eb",
-        tabBarInactiveTintColor: "#64748b",
+
+        tabBarActiveTintColor: "#7C3AED",
+        tabBarInactiveTintColor: "#94A3B8",
+
         tabBarStyle: {
-          height: 56 + Math.max(insets.bottom, 8),
+          height: 60 + Math.max(insets.bottom, 8),
           paddingTop: 6,
           paddingBottom: Math.max(insets.bottom, 8),
+
+          borderTopWidth: 0,
+          elevation: 0,
+
+          backgroundColor: "#ffffff",
         },
       }}
     >
@@ -36,37 +49,40 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: "Explore",
-          tabBarIcon: ({
-            color,
-            size,
-          }) => (
+
+          tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name="compass-outline"
+              name={focused ? "home" : "home-outline"}
               color={color}
               size={size}
             />
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: "Explore",
+
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "compass" : "compass-outline"}
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="library"
         options={{
           title: "Library",
-          tabBarIcon: ({
-            color,
-            size,
-          }) => (
+
+          tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name="library-outline"
+              name={focused ? "library" : "library-outline"}
               color={color}
               size={size}
             />
@@ -78,16 +94,38 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({
-            color,
-            size,
-          }) => (
-            <Ionicons
-              name="person-circle-outline"
-              color={color}
-              size={size}
-            />
-          ),
+
+          tabBarIcon: ({ color, size, focused }) =>
+            user?.photo ? (
+              <Image
+                source={{
+                  uri: user.photo,
+                }}
+                contentFit="cover"
+                transition={200}
+                style={{
+                  width: focused ? size + 10 : size + 4,
+                  height: focused ? size + 10 : size + 4,
+
+                  borderRadius: 999,
+
+                  borderWidth: 2,
+                  borderColor: focused
+                    ? "#7C3AED"
+                    : "transparent",
+                }}
+              />
+            ) : (
+              <Ionicons
+                name={
+                  focused
+                    ? "person-circle"
+                    : "person-circle-outline"
+                }
+                color={color}
+                size={size}
+              />
+            ),
         }}
       />
     </Tabs>
