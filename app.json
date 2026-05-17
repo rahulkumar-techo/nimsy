@@ -14,7 +14,11 @@
     "android": {
       "package": "com.rahul.nimsyclient",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "static",
@@ -61,8 +65,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "82f407b1-6aa2-4f9e-b8f4-a8a875a02906"
+        "projectId": "2a052916-77e1-4799-843f-ee5a3e2a8f42"
       }
-    }
+    },
+    "owner": "mrrhl02"
   }
 }
