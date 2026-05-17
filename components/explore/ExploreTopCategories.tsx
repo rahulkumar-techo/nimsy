@@ -1,4 +1,7 @@
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import SeeAll from "../SeeAll";
+import CategoryCard from "../home-comp/CategoryCard";
+import { useRouter } from "expo-router";
 
 type Item = {
   id?: string;
@@ -12,32 +15,52 @@ type Props = {
   onItemPress?: (item: Item) => void;
 };
 
-const ExploreTopCategories = ({ items, onItemPress }: Props) => (
+const ExploreTopCategories = ({ items, onItemPress }: Props) =>{
+    const router = useRouter();
+  
+   const handleCategory = (
+    title: string,
+    id: string
+  ) => {
+    router.push({
+      pathname: "/category",
+      params: {
+        id,
+        title,
+      },
+    });
+  };
+  return  (
   <View className="mt-8 px-5">
     <View className="mb-4 flex-row items-center justify-between">
       <Text className="text-xl font-bold text-black">Top Categories</Text>
-      <Text className="font-semibold text-violet-600">See All</Text>
+       <SeeAll
+          title="Top Categories"
+          
+          data={items}
+          renderItem={({ item }) => (
+            <CategoryCard
+            horizontalSection
+            key={item.id}
+            {...item}
+            onPress={() => handleCategory(item.title, item.id as any)}
+          />
+          )}
+        />
     </View>
 
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      {items.map((item, index) => (
-        <TouchableOpacity
-          key={item.id ?? index}
-          onPress={() => onItemPress?.(item)}
-          activeOpacity={0.85}
-          className="mr-4 w-36 overflow-hidden rounded-3xl bg-gray-100"
-        >
-          <Image source={{ uri: item.image }} className="h-32 w-full" />
-          <View className="p-3">
-            <Text className="text-lg font-bold text-black">{item.title}</Text>
-            <Text className="mt-1 text-gray-500">
-              {item.count ? `${item.count} stories` : "120 stories"}
-            </Text>
-          </View>
-        </TouchableOpacity>
+      {items.slice(0,5).map((item, index) => (
+         <CategoryCard
+            
+            key={item.id+Date.now().toString()}
+            {...item}
+            onPress={() => handleCategory(item.title, item.id as any)}
+          />
       ))}
     </ScrollView>
   </View>
-);
+)
+}
 
 export default ExploreTopCategories;

@@ -12,6 +12,7 @@ function RootNavigator() {
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="audio" />
         <Stack.Screen name="category/index" />
       </Stack>
     </>

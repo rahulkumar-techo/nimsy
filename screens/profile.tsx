@@ -39,15 +39,22 @@ const ProfileScreen = () => {
     useState("child");
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
-        contentContainerStyle={{
-          paddingBottom: 120,
-        }}
-      >
+    <SafeAreaView
+         className="flex-1 bg-white"
+         edges={[
+           "top",
+           "left",
+           "right",
+         ]}
+       >
+         <ScrollView
+           showsVerticalScrollIndicator={
+             false
+           }
+           contentContainerStyle={{
+             paddingBottom: 120,
+           }}
+         >
         <View className="px-5 pt-4">
           <Text className="text-5xl font-black text-slate-900">
             Profile

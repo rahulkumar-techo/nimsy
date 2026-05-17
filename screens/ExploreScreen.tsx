@@ -318,9 +318,9 @@ const ExploreScreen = () => {
               <ExploreAudioStories />
 
               <ExploreByAge
-                groups={
-                  ageGroups
-                }
+                // groups={
+                //   ageGroups
+                // }
               />
 
               <ExploreRecommended

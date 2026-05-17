@@ -21,7 +21,12 @@ type Props = {
 const CATEGORY_ROUTES: Record<string, Href> = {
   stories: "/stories",
   videos: "/videos",
-  audio: "/audio",
+  audio: {
+    pathname: "/audio",
+    params: {
+      id: "1",
+    },
+  },
   favorites: "/favorites",
 }
 

@@ -6,6 +6,7 @@ import React from "react";
 
 import {
   FlatList,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -246,7 +247,22 @@ const LibraryScreen = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+     <SafeAreaView
+          className="flex-1 bg-white"
+          edges={[
+            "top",
+            "left",
+            "right",
+          ]}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={
+              false
+            }
+            contentContainerStyle={{
+              paddingBottom: 120,
+            }}
+          >
       <FlatList
         data={sections}
         keyExtractor={(item) =>
@@ -300,6 +316,7 @@ const LibraryScreen = () => {
           </>
         }
       />
+      </ScrollView>
     </SafeAreaView>
   );
 };
