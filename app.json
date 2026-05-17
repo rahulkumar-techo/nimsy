@@ -32,10 +32,8 @@
           "backgroundColor": "#ffffff",
           "dark": {
             "backgroundColor": "#000000"
-          },
-          
+          }
         }
-        
       ],
       [
         "expo-image-picker",
@@ -53,7 +51,7 @@
       ],
       "expo-audio",
       "expo-video",
-      
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
