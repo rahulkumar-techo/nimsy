@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import SeeAll from "../SeeAll";
+import { useTheme } from "@/context/ThemeContext";
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
@@ -35,6 +36,8 @@ const SearchTag = ({
   onPress,
   fullWidth = false,
 }: SearchTagProps) => {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -43,13 +46,13 @@ const SearchTag = ({
         mb-3
         ${fullWidth ? "w-full" : "mr-3"}
         rounded-full
-        bg-gray-100
         px-4
         py-3
       `}
+      style={{ backgroundColor: colors.card }}
     >
 
-      <Text className="font-medium text-gray-700">
+      <Text className="font-medium" style={{ color: colors.text }}>
         {title}
       </Text>
 
@@ -63,6 +66,7 @@ const SearchTag = ({
 
 const ExplorePopularSearches =
   ({ items }: Props) => {
+    const { colors } = useTheme();
 
     /**
      * Handle Tag Press
@@ -82,7 +86,10 @@ const ExplorePopularSearches =
         {/* Header */}
         <View className="mb-4 flex-row items-center justify-between">
 
-          <Text className="text-xl font-bold text-black">
+          <Text
+            className="text-xl font-bold"
+            style={{ color: colors.text }}
+          >
             Popular Searches
           </Text>
 

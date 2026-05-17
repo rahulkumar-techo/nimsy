@@ -17,6 +17,7 @@ import {
 import {
   Ionicons,
 } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   item: {
@@ -33,12 +34,15 @@ const SearchCard = ({
   item,
   onPress,
 }: Props) => {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      className="mb-4 flex-row overflow-hidden rounded-3xl bg-white"
+      className="mb-4 flex-row overflow-hidden rounded-3xl"
       style={{
+        backgroundColor: colors.card,
         elevation: 2,
       }}
     >
@@ -58,14 +62,16 @@ const SearchCard = ({
         <View>
           <Text
             numberOfLines={1}
-            className="text-lg font-bold text-black"
+            className="text-lg font-bold"
+            style={{ color: colors.text }}
           >
             {item.title}
           </Text>
 
           <Text
             numberOfLines={2}
-            className="mt-2 text-sm leading-5 text-gray-500"
+            className="mt-2 text-sm leading-5"
+            style={{ color: colors.secondaryText }}
           >
             Explore fun and engaging
             stories from this category.
@@ -77,10 +83,13 @@ const SearchCard = ({
             <Ionicons
               name="book-outline"
               size={16}
-              color="#7C3AED"
+              color={colors.primary}
             />
 
-            <Text className="ml-1 text-sm font-medium text-violet-600">
+            <Text
+              className="ml-1 text-sm font-medium"
+              style={{ color: colors.primary }}
+            >
               {item.stories.length} stories
             </Text>
           </View>
@@ -88,7 +97,7 @@ const SearchCard = ({
           <Ionicons
             name="arrow-forward-circle"
             size={26}
-            color="#7C3AED"
+            color={colors.primary}
           />
         </View>
       </View>

@@ -1,7 +1,8 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import SeeAll from "../SeeAll";
 import CategoryCard from "../home-comp/CategoryCard";
 import { useRouter } from "expo-router";
+import { useTheme } from "@/context/ThemeContext";
 
 type Item = {
   id?: string;
@@ -17,6 +18,7 @@ type Props = {
 
 const ExploreTopCategories = ({ items, onItemPress }: Props) =>{
     const router = useRouter();
+    const { colors } = useTheme();
   
    const handleCategory = (
     title: string,
@@ -33,7 +35,12 @@ const ExploreTopCategories = ({ items, onItemPress }: Props) =>{
   return  (
   <View className="mt-8 px-5">
     <View className="mb-4 flex-row items-center justify-between">
-      <Text className="text-xl font-bold text-black">Top Categories</Text>
+      <Text
+        className="text-xl font-bold"
+        style={{ color: colors.text }}
+      >
+        Top Categories
+      </Text>
        <SeeAll
           title="Top Categories"
           

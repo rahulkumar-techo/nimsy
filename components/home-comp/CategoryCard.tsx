@@ -16,6 +16,7 @@ import {
 import {
   Ionicons,
 } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   title: string;
@@ -44,6 +45,8 @@ const CategoryCard = ({
   trending,
   premium,
 }: Props) => {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -51,17 +54,18 @@ const CategoryCard = ({
       className={`
         overflow-hidden
         rounded-3xl
-        bg-white
-        dark:bg-zinc-900
         shadow-sm
-        dark:border
-        dark:border-zinc-800
+        border
         
         ${horizontalSection
           ? "mb-4 flex-row"
           : "mr-4 w-44"
         }
       `}
+      style={{
+        backgroundColor: colors.card,
+        borderColor: colors.border,
+      }}
     >
       {/* Image */}
       <View
@@ -114,7 +118,8 @@ const CategoryCard = ({
 
           <Text
             numberOfLines={1}
-            className="text-lg font-bold text-black dark:text-white"
+            className="text-lg font-bold"
+            style={{ color: colors.text }}
           >
             {title}
           </Text>
@@ -122,7 +127,8 @@ const CategoryCard = ({
           {!!subtitle && (
             <Text
               numberOfLines={2}
-              className="mt-1 text-sm text-zinc-500"
+              className="mt-1 text-sm"
+              style={{ color: colors.secondaryText }}
             >
               {subtitle}
             </Text>
@@ -133,7 +139,10 @@ const CategoryCard = ({
         {/* Footer */}
         <View className="mt-4 flex-row items-center justify-between">
 
-          <Text className="text-sm font-medium text-zinc-500">
+          <Text
+            className="text-sm font-medium"
+            style={{ color: colors.secondaryText }}
+          >
             {count
               ? `${count} stories`
               : "120 stories"}
@@ -141,11 +150,14 @@ const CategoryCard = ({
 
           {
             horizontalSection && (
-              <View className="h-9 w-9 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+              <View
+                className="h-9 w-9 items-center justify-center rounded-full"
+                style={{ backgroundColor: colors.background }}
+              >
                 <Ionicons
                   name="arrow-forward"
                   size={18}
-                  color="gray"
+                  color={colors.secondaryText}
                 />
               </View>
             )

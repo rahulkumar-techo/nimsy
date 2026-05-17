@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   title: string;
@@ -21,6 +22,8 @@ const RecentViewedCard = ({
   progress,
   image,
 }: Props) => {
+  const { colors } = useTheme();
+
   return (
     <View className="mr-4 w-44">
       <Image
@@ -30,11 +33,11 @@ const RecentViewedCard = ({
         className="h-40 w-full rounded-[28px]"
       />
 
-      <Text className="mt-3 text-xl font-bold text-slate-900">
+      <Text className="mt-3 text-xl font-bold" style={{ color: colors.text }}>
         {title}
       </Text>
 
-      <Text className="mt-1 text-slate-500">
+      <Text className="mt-1" style={{ color: colors.secondaryText }}>
         {progress}
       </Text>
     </View>

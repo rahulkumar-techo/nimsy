@@ -24,8 +24,10 @@ import AudioStoryPlayer from "@/components/AudioStoryPlayer";
 import {
   DUMMY_AUDIO_STORIES,
 } from "@/constants/audio_data";
+import { useTheme } from "@/context/ThemeContext";
 
 const AudioDetails = () => {
+  const { colors } = useTheme();
   const { id } =
     useLocalSearchParams<{
       id?: string | string[];
@@ -41,17 +43,27 @@ const AudioDetails = () => {
 
   if (!story) {
     return (
-      <SafeAreaView className="flex-1 bg-[#4f35d7]">
+      <SafeAreaView
+        className="flex-1"
+        style={{ backgroundColor: colors.background }}
+      >
         <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-center text-2xl font-bold text-white">
+          <Text
+            className="text-center text-2xl font-bold"
+            style={{ color: colors.text }}
+          >
             Audio Story Not Found
           </Text>
 
           <TouchableOpacity
             onPress={() => router.back()}
-            className="mt-6 rounded-full bg-white px-6 py-3"
+            className="mt-6 rounded-full px-6 py-3"
+            style={{ backgroundColor: colors.primary }}
           >
-            <Text className="font-bold text-[#4f35d7]">
+            <Text
+              className="font-bold"
+              style={{ color: colors.buttonText }}
+            >
               Go Back
             </Text>
           </TouchableOpacity>
@@ -61,7 +73,10 @@ const AudioDetails = () => {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#4f35d7]">
+    <SafeAreaView
+      className="flex-1"
+      style={{ backgroundColor: colors.primary }}
+    >
       <AudioStoryPlayer
         story={story}
       />

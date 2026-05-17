@@ -7,6 +7,7 @@
 import { View, Text, Image, Pressable } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import React from "react"
+import { useTheme } from "@/context/ThemeContext"
 
 type Props = {
   title: string
@@ -21,15 +22,18 @@ export default function ContinueWatchingCard({
   progress = 0.3,
   onPress,
 }: Props) {
+  const { colors } = useTheme()
+
   return (
     <Pressable
       onPress={onPress}
-      className="w-full rounded-2xl bg-white px-5 py-4"
+      className="w-full rounded-2xl px-5 py-4"
       style={{
+        backgroundColor: colors.card,
         width: "100%",
         maxWidth: 420,
         alignSelf: "center",
-        shadowColor: "#000",
+        shadowColor: colors.shadow,
         shadowOpacity: 0.05,
         shadowRadius: 6,
         shadowOffset: { width: 0, height: 2 },
@@ -50,21 +54,25 @@ export default function ContinueWatchingCard({
         <View className="flex-1">
           <Text
             numberOfLines={2}
-            className="text-sm font-semibold text-slate-800"
+            className="text-sm font-semibold"
+            style={{ color: colors.text }}
           >
             {title}
           </Text>
         </View>
 
         {/* Play Button */}
-        <Ionicons name="play-circle" size={28} color="#2563eb" />
+        <Ionicons name="play-circle" size={28} color={colors.primary} />
       </View>
 
       {/* Progress Bar */}
-      <View className="mt-3 h-1 bg-gray-200 rounded-full">
+      <View
+        className="mt-3 h-1 rounded-full"
+        style={{ backgroundColor: colors.border }}
+      >
         <View
-          className="h-1 bg-blue-600 rounded-full"
-          style={{ width: `${progress * 100}%` }}
+          className="h-1 rounded-full"
+          style={{ width: `${progress * 100}%`, backgroundColor: colors.primary }}
         />
       </View>
     </Pressable>

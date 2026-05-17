@@ -31,6 +31,7 @@ import SeeAll from "../SeeAll";
 import {
   DUMMY_AUDIO_STORIES,
 } from "@/constants/audio_data";
+import { useTheme } from "@/context/ThemeContext";
 
 type AudioItem = {
   id: string;
@@ -51,6 +52,8 @@ const AudioCard = memo(
     item,
     onPress,
   }: CardProps) => {
+    const { colors } = useTheme();
+
     return (
       <Pressable
         onPress={() => onPress(item)}
@@ -102,7 +105,7 @@ const AudioCard = memo(
                 <Ionicons
                   name="play"
                   size={22}
-                  color="#7c3aed"
+                  color={colors.primary}
                 />
               </Pressable>
             </View>
@@ -118,6 +121,7 @@ AudioCard.displayName = "AudioCard";
 const ExploreAudioStories =
   () => {
     const router = useRouter();
+    const { colors } = useTheme();
 
     const handleOpenAudio =
       useCallback(
@@ -154,7 +158,7 @@ const ExploreAudioStories =
 
         {/* Header */}
         <View className="mb-4 flex-row items-center justify-between px-5">
-          <Text className="text-xl font-bold text-black">
+          <Text className="text-xl font-bold" style={{ color: colors.text }}>
             Audio Stories
           </Text>
 

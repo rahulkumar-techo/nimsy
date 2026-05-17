@@ -16,6 +16,7 @@ import {
 import {
   Ionicons,
 } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   value: string;
@@ -46,15 +47,19 @@ const ExploreSearch = ({
 }: Props) => {
   const [isOpen, setIsOpen] =
     useState(false);
+  const { colors } = useTheme();
 
   return (
     <View className="z-50 mt-6 px-5">
       <View className="flex-row items-center">
-        <View className="mr-3 flex-1 flex-row items-center rounded-2xl bg-gray-100 px-4 py-3">
+        <View
+          className="mr-3 flex-1 flex-row items-center rounded-2xl px-4 py-3"
+          style={{ backgroundColor: colors.inputBackground }}
+        >
           <Ionicons
             name="search"
             size={20}
-            color="gray"
+            color={colors.secondaryText}
           />
 
           <TextInput
@@ -63,8 +68,9 @@ const ExploreSearch = ({
               onChangeText
             }
             placeholder="Search stories..."
-            placeholderTextColor="gray"
-            className="ml-3 flex-1 text-black"
+            placeholderTextColor={colors.secondaryText}
+            className="ml-3 flex-1"
+            style={{ color: colors.inputText }}
           />
         </View>
 
@@ -75,7 +81,8 @@ const ExploreSearch = ({
               !isOpen
             )
           }
-          className="h-14 w-14 items-center justify-center rounded-2xl bg-violet-600"
+          className="h-14 w-14 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: colors.primary }}
         >
           <Ionicons
             name={
@@ -84,7 +91,7 @@ const ExploreSearch = ({
                 : "options-outline"
             }
             size={24}
-            color="white"
+            color={colors.buttonText}
           />
         </TouchableOpacity>
       </View>
@@ -92,8 +99,9 @@ const ExploreSearch = ({
       {
         isOpen && (
           <View
-            className="mt-4 rounded-3xl bg-white p-2"
+            className="mt-4 rounded-3xl p-2"
             style={{
+              backgroundColor: colors.card,
               elevation: 4,
             }}
           >
@@ -123,18 +131,18 @@ const ExploreSearch = ({
                           false
                         );
                       }}
-                      className={`mb-2 rounded-2xl px-4 py-4 ${
-                        active
-                          ? "bg-violet-600"
-                          : "bg-gray-100"
-                      }`}
+                      className="mb-2 rounded-2xl px-4 py-4"
+                      style={{
+                        backgroundColor: active
+                          ? colors.primary
+                          : colors.background,
+                      }}
                     >
                       <Text
-                        className={`text-base font-semibold ${
-                          active
-                            ? "text-white"
-                            : "text-black"
-                        }`}
+                        className="text-base font-semibold"
+                        style={{
+                          color: active ? colors.buttonText : colors.text,
+                        }}
                       >
                         {item}
                       </Text>

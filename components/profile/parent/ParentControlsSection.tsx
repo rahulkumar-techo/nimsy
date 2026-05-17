@@ -11,13 +11,14 @@ import {
 
 import SectionHeader from "../SectionHeader";
 import ParentControlCard from "./ParentControlCard";
+import { Ionicons } from "@expo/vector-icons";
 
 type Control = {
   id: string;
   title: string;
   subtitle: string;
   status: string;
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
 };
 
 const PARENT_CONTROLS: Control[] = [

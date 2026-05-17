@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import SeeAll from "../SeeAll";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props<T> = {
   title: string;
@@ -36,6 +37,7 @@ const SectionHeader = <T,>({
   horizontal,
   onSeeAll,
 }: Props<T>) => {
+  const { colors } = useTheme();
   const showModalSeeAll =
     !!data &&
     !!renderItem;
@@ -53,7 +55,10 @@ const SectionHeader = <T,>({
 
   return (
     <View className="mb-4 mt-8 flex-row items-center justify-between">
-      <Text className="text-2xl font-black text-slate-900">
+      <Text
+        className="text-2xl font-black"
+        style={{ color: colors.text }}
+      >
         {title}
       </Text>
 
@@ -73,7 +78,7 @@ const SectionHeader = <T,>({
           activeOpacity={0.7}
           onPress={onSeeAll}
         >
-          <Text className="font-bold text-violet-600">
+          <Text className="font-bold" style={{ color: colors.primary }}>
             View All
           </Text>
         </TouchableOpacity>

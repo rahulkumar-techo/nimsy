@@ -10,10 +10,12 @@ import React from "react"
 import { useAuth } from "@/context/AuthContext"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function NavHeader() {
   const { user } = useAuth();
   const route = useRouter();
+  const { colors } = useTheme();
 
   const initials =
     user?.name?.charAt(0).toUpperCase() ?? "U"
@@ -36,8 +38,14 @@ export default function NavHeader() {
               className="w-12 h-12 rounded-full"
             />
           ) : (
-            <View className="w-12 h-12 rounded-full bg-blue-500 items-center justify-center">
-              <Text className="text-white font-bold text-lg">
+            <View
+              className="w-12 h-12 rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.primary }}
+            >
+              <Text
+                className="font-bold text-lg"
+                style={{ color: colors.buttonText }}
+              >
                 {initials}
               </Text>
             </View>
@@ -46,10 +54,16 @@ export default function NavHeader() {
 
         {/* Greeting */}
         <View>
-          <Text className="text-slate-500 text-sm">
+          <Text
+            className="text-sm"
+            style={{ color: colors.secondaryText }}
+          >
             Hello 👋
           </Text>
-          <Text className="text-lg font-semibold text-slate-900">
+          <Text
+            className="text-lg font-semibold"
+            style={{ color: colors.text }}
+          >
             {user?.name ?? "User"}
           </Text>
         </View>
@@ -57,7 +71,7 @@ export default function NavHeader() {
 
       {/* Right Section */}
       <Pressable className="p-2">
-        <Ionicons name="search" size={22} color="#0f172a" />
+        <Ionicons name="search" size={22} color={colors.text} />
       </Pressable>
 
     </View>

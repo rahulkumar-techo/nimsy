@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   title: string;
@@ -20,8 +21,13 @@ const FavoriteCard = ({
   title,
   image,
 }: Props) => {
+  const { colors } = useTheme();
+
   return (
-    <TouchableOpacity className="mr-4 w-44 overflow-hidden rounded-[28px] bg-white">
+    <TouchableOpacity
+      className="mr-4 w-44 overflow-hidden rounded-[28px]"
+      style={{ backgroundColor: colors.card }}
+    >
       <Image
         source={{
           uri: image,
@@ -30,7 +36,7 @@ const FavoriteCard = ({
       />
 
       <View className="p-4">
-        <Text className="text-lg font-bold text-slate-900">
+        <Text className="text-lg font-bold" style={{ color: colors.text }}>
           {title}
         </Text>
       </View>

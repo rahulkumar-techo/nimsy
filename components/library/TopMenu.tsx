@@ -12,6 +12,7 @@ import {
 import {
   Ionicons,
 } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   item: {
@@ -24,6 +25,8 @@ type Props = {
 const TopMenu = ({
   item,
 }: Props) => {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity className="items-center">
       <View
@@ -36,7 +39,10 @@ const TopMenu = ({
         />
       </View>
 
-      <Text className="mt-3 text-base font-semibold text-slate-800">
+      <Text
+        className="mt-3 text-base font-semibold"
+        style={{ color: colors.text }}
+      >
         {item.title}
       </Text>
     </TouchableOpacity>

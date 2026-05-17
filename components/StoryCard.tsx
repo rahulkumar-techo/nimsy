@@ -9,6 +9,7 @@ import {
 
 import type { Story } from "@/constants/story";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
 
 const CATEGORY_STYLES: Record<
   string,
@@ -41,6 +42,7 @@ const CATEGORY_STYLES: Record<
 };
 
 const StoryCard = ({ item }: { item: Story }) => {
+  const { colors } = useTheme();
   const categoryStyle = CATEGORY_STYLES[item.categoryId] || {
     avatarBg: "bg-slate-100",
     iconColor: "#475569",
@@ -58,12 +60,13 @@ const StoryCard = ({ item }: { item: Story }) => {
   return (
     <TouchableOpacity
       activeOpacity={0.95}
-      className="mb-6 bg-white"
+      className="mb-6"
+      style={{ backgroundColor: colors.background }}
       onPress={handlePress}
     >
       <View
-        className="relative overflow-hidden rounded-2xl bg-slate-200"
-        style={{ aspectRatio: 16 / 9 }}
+        className="relative overflow-hidden rounded-2xl"
+        style={{ aspectRatio: 16 / 9, backgroundColor: colors.card }}
       >
         <Image
           source={{ uri: item.thumbnail }}
@@ -74,8 +77,14 @@ const StoryCard = ({ item }: { item: Story }) => {
         />
 
         {item.featured && (
-          <View className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1">
-            <Text className="text-[11px] font-semibold uppercase tracking-wide text-slate-900">
+          <View
+            className="absolute left-3 top-3 rounded-full px-3 py-1"
+            style={{ backgroundColor: colors.card }}
+          >
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-wide"
+              style={{ color: colors.text }}
+            >
               Featured
             </Text>
           </View>
@@ -102,36 +111,59 @@ const StoryCard = ({ item }: { item: Story }) => {
         <View className="ml-3 flex-1">
           <Text
             numberOfLines={2}
-            className="text-[16px] font-bold leading-6 text-slate-900"
+            className="text-[16px] font-bold leading-6"
+            style={{ color: colors.text }}
           >
             {item.title}
           </Text>
 
           <View className="mt-1 flex-row items-center">
-            <Text className="text-[13px] font-medium text-slate-500">
+            <Text
+              className="text-[13px] font-medium"
+              style={{ color: colors.secondaryText }}
+            >
               {item.author}
             </Text>
-            <View className="mx-2 h-1 w-1 rounded-full bg-slate-300" />
-            <Text className="text-[13px] font-medium text-slate-500">
+            <View
+              className="mx-2 h-1 w-1 rounded-full"
+              style={{ backgroundColor: colors.border }}
+            />
+            <Text
+              className="text-[13px] font-medium"
+              style={{ color: colors.secondaryText }}
+            >
               {item.categoryTitle}
             </Text>
           </View>
 
           <Text
             numberOfLines={2}
-            className="mt-2 text-[13px] leading-5 text-slate-500"
+            className="mt-2 text-[13px] leading-5"
+            style={{ color: colors.secondaryText }}
           >
             {item.story.intro}
           </Text>
 
           <View className="mt-3 flex-row flex-wrap items-center">
-            <View className="mb-2 mr-2 rounded-full bg-slate-100 px-3 py-1">
-              <Text className="text-[11px] font-medium text-slate-600">
+            <View
+              className="mb-2 mr-2 rounded-full px-3 py-1"
+              style={{ backgroundColor: colors.card }}
+            >
+              <Text
+                className="text-[11px] font-medium"
+                style={{ color: colors.secondaryText }}
+              >
                 Age {item.ageGroup}
               </Text>
             </View>
-            <View className="mb-2 mr-2 rounded-full bg-slate-100 px-3 py-1">
-              <Text className="text-[11px] font-medium text-slate-600">
+            <View
+              className="mb-2 mr-2 rounded-full px-3 py-1"
+              style={{ backgroundColor: colors.card }}
+            >
+              <Text
+                className="text-[11px] font-medium"
+                style={{ color: colors.secondaryText }}
+              >
                 {item.language}
               </Text>
             </View>
@@ -147,7 +179,10 @@ const StoryCard = ({ item }: { item: Story }) => {
             ))}
           </View>
 
-          <Text className="mt-[2px] text-[12px] text-slate-400">
+          <Text
+            className="mt-[2px] text-[12px]"
+            style={{ color: colors.secondaryText }}
+          >
             {item.views.toLocaleString()} plays • {item.likes.toLocaleString()} likes
           </Text>
         </View>
@@ -156,7 +191,7 @@ const StoryCard = ({ item }: { item: Story }) => {
           <Ionicons
             name="play-circle-outline"
             size={18}
-            color="#64748b"
+            color={colors.secondaryText}
           />
         </TouchableOpacity>
       </View>

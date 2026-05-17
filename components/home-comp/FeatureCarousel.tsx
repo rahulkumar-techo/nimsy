@@ -2,15 +2,15 @@
  * FeatureCarousel (Logic + Slider)
  */
 
-import React, { useRef, useState } from "react"
+import React, { useState } from "react"
 import {
   FlatList,
-  Platform,
   View,
   useWindowDimensions,
   type ImageSourcePropType,
 } from "react-native"
 import FeatureCard from "./FeatureCard"
+import { useTheme } from "@/context/ThemeContext"
 
 type Props = {
   data: {
@@ -22,26 +22,9 @@ type Props = {
 
 export default function FeatureCarousel({ data }: Props) {
   const { width } = useWindowDimensions()
+  const { colors } = useTheme()
   const [activeIndex, setActiveIndex] = useState(0)
   const cardWidth = width - 32
-  const snapDecelerationRate = Platform.select({
-    ios: 0.994,
-    android: 0.985,
-    default: 0.99,
-  })
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60,
-  })
-
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
-      const index = viewableItems[0]?.index
-      if (typeof index === "number") {
-        setActiveIndex(index)
-      }
-    }
-  )
 
   return (
     <View>
@@ -87,10 +70,11 @@ export default function FeatureCarousel({ data }: Props) {
         {data.map((_, index) => (
           <View
             key={index}
-            className={`h-2 rounded-full ${index === activeIndex
-                ? "w-6 bg-blue-600"
-                : "w-2 bg-blue-200"
-              }`}
+            className={`h-2 rounded-full ${index === activeIndex ? "w-6" : "w-2"}`}
+            style={{
+              backgroundColor:
+                index === activeIndex ? colors.primary : colors.border,
+            }}
           />
         ))}
       </View>

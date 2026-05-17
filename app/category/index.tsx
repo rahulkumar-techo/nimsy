@@ -18,6 +18,7 @@ import {
   getStoriesByCategory,
   type Story,
 } from "@/constants/story";
+import { useTheme } from "@/context/ThemeContext";
 
 const FILTER_CHIPS = [
   "Latest",
@@ -36,6 +37,7 @@ const renderStoryItem = ({
 const ItemSeparator = () => <View className="h-5" />;
 
 const Category = () => {
+  const { colors, theme } = useTheme();
   const { id, title } = useLocalSearchParams<{
     id?: string;
     title?: string;
@@ -46,13 +48,22 @@ const Category = () => {
   const screenTitle = category?.title || title || "Stories";
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
+    >
       <StatusBar
-        barStyle="dark-content"
-        backgroundColor="#ffffff"
+        barStyle={theme === "light" ? "dark-content" : "light-content"}
+        backgroundColor={colors.background}
       />
 
-      <View className="px-4 pt-2 pb-4 bg-white border-b border-slate-100">
+      <View
+        className="px-4 pt-2 pb-4 border-b"
+        style={{
+          backgroundColor: colors.background,
+          borderBottomColor: colors.border,
+        }}
+      >
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1">
             <TouchableOpacity
@@ -63,19 +74,23 @@ const Category = () => {
               <Ionicons
                 name="arrow-back"
                 size={24}
-                color="#0f172a"
+                color={colors.text}
               />
             </TouchableOpacity>
 
             <View className="ml-3 flex-1">
               <Text
                 numberOfLines={1}
-                className="text-lg font-bold text-slate-900 capitalize"
+                className="text-lg font-bold capitalize"
+                style={{ color: colors.text }}
               >
                 {screenTitle}
               </Text>
 
-              <Text className="text-xs text-slate-500 mt-[2px]">
+              <Text
+                className="text-xs mt-[2px]"
+                style={{ color: colors.secondaryText }}
+              >
                 {storiesData.length} stories
               </Text>
             </View>
@@ -84,11 +99,11 @@ const Category = () => {
           <TouchableOpacity
             className="w-10 h-10 rounded-full items-center justify-center"
           >
-            <Ionicons
-              name="search"
-              size={22}
-              color="#0f172a"
-            />
+              <Ionicons
+                name="search"
+                size={22}
+                color={colors.text}
+              />
           </TouchableOpacity>
         </View>
 
@@ -100,8 +115,14 @@ const Category = () => {
           }}
           className="mt-4"
         >
-          <View className="bg-black px-4 py-2 rounded-full mr-2">
-            <Text className="text-white text-xs font-semibold">
+          <View
+            className="px-4 py-2 rounded-full mr-2"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <Text
+              className="text-xs font-semibold"
+              style={{ color: colors.buttonText }}
+            >
               {screenTitle}
             </Text>
           </View>
@@ -109,9 +130,13 @@ const Category = () => {
           {FILTER_CHIPS.map((chip) => (
             <View
               key={chip}
-              className="mr-2 rounded-full bg-slate-100 px-4 py-2"
+              className="mr-2 rounded-full px-4 py-2"
+              style={{ backgroundColor: colors.card }}
             >
-              <Text className="text-xs font-medium text-slate-700">
+              <Text
+                className="text-xs font-medium"
+                style={{ color: colors.text }}
+              >
                 {chip}
               </Text>
             </View>
@@ -138,19 +163,28 @@ const Category = () => {
         }}
         ListEmptyComponent={
           <View className="items-center justify-center py-24">
-            <View className="w-20 h-20 rounded-full bg-slate-100 items-center justify-center mb-4">
+            <View
+              className="w-20 h-20 rounded-full items-center justify-center mb-4"
+              style={{ backgroundColor: colors.card }}
+            >
               <Ionicons
                 name="film-outline"
                 size={36}
-                color="#64748b"
+                color={colors.secondaryText}
               />
             </View>
 
-            <Text className="text-xl font-bold text-slate-800">
+            <Text
+              className="text-xl font-bold"
+              style={{ color: colors.text }}
+            >
               No Stories Found
             </Text>
 
-            <Text className="text-slate-500 text-center mt-2 px-10 leading-6">
+            <Text
+              className="text-center mt-2 px-10 leading-6"
+              style={{ color: colors.secondaryText }}
+            >
               Stories for this category will appear here.
             </Text>
           </View>

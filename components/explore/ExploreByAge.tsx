@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import SeeAll from "../SeeAll";
+import { useTheme } from "@/context/ThemeContext";
 
 type AgeGroup = {
   id: string;
@@ -76,6 +77,8 @@ const AgeCard = memo(
     onPress,
     fullWidth = false,
   }: AgeCardProps) => {
+    const { colors } = useTheme();
+
     return (
       <TouchableOpacity
         activeOpacity={0.9}
@@ -89,19 +92,20 @@ const AgeCard = memo(
           items-center 
           justify-center 
           rounded-3xl 
-          ${item.bg}
         `}
+        style={{ backgroundColor: colors.primaryLight }}
       >
 
         {/* Age */}
         <Text
-          className={`text-3xl font-bold ${item.text}`}
+          className="text-3xl font-bold"
+          style={{ color: colors.primary }}
         >
           {item.label}
         </Text>
 
         {/* Subtitle */}
-        <Text className="mt-2 text-gray-600">
+        <Text className="mt-2" style={{ color: colors.secondaryText }}>
           {item.subtitle}
         </Text>
 
@@ -118,6 +122,7 @@ AgeCard.displayName =
  */
 const ExploreByAge =
   () => {
+    const { colors } = useTheme();
 
     /**
      * Handle Press
@@ -141,7 +146,7 @@ const ExploreByAge =
         {/* Header */}
         <View className="mb-4 flex-row items-center justify-between">
 
-          <Text className="text-xl font-bold text-black">
+          <Text className="text-xl font-bold" style={{ color: colors.text }}>
             Explore by Age
           </Text>
 

@@ -3,16 +3,21 @@ import { ActivityIndicator, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import UserAuth from "@/components/UserAuth"
 import { useAuth } from "@/context/AuthContext"
+import { useTheme } from "@/context/ThemeContext"
 
 export default function Index() {
   const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth()
+  const { colors } = useTheme()
 
   if (user) {
     if (!isOnboardingReady) {
       return (
-        <SafeAreaView className="flex-1 bg-slate-50">
+        <SafeAreaView
+          className="flex-1"
+          style={{ backgroundColor: colors.background }}
+        >
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#2563eb" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         </SafeAreaView>
       )
@@ -24,7 +29,10 @@ export default function Index() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
+    <SafeAreaView
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
+    >
       <UserAuth />
     </SafeAreaView>
   )

@@ -16,9 +16,11 @@ import {
   Ionicons,
 } from "@expo/vector-icons";
 import ProfileModal from "../ProfileModel";
+import { useTheme } from "@/context/ThemeContext";
 
 const ProfileHeader = () => {
   const { user } = useAuth();
+  const { colors } = useTheme();
   return (
     <View className="flex-row items-start justify-between">
       {/* LEFT */}
@@ -41,18 +43,28 @@ const ProfileHeader = () => {
         <View className="ml-4 flex-1">
           <Text
             numberOfLines={1}
-            className="text-3xl font-black text-slate-900"
+            className="text-3xl font-black"
+            style={{ color: colors.text }}
           >
             {user?.name}
           </Text>
 
-          <View className="mt-3 self-start rounded-full bg-violet-600 px-4 py-2">
-            <Text className="font-bold text-white">
+          <View
+            className="mt-3 self-start rounded-full px-4 py-2"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <Text
+              className="font-bold"
+              style={{ color: colors.buttonText }}
+            >
               Level 12
             </Text>
           </View>
 
-          <Text className="mt-3 text-base text-slate-500">
+          <Text
+            className="mt-3 text-base"
+            style={{ color: colors.secondaryText }}
+          >
             ⭐ Little Explorer
           </Text>
         </View>
@@ -60,19 +72,25 @@ const ProfileHeader = () => {
 
       {/* RIGHT ICONS */}
       <View className="ml-3 flex-row items-center">
-        <TouchableOpacity className="mr-3 h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+        <TouchableOpacity
+          className="mr-3 h-12 w-12 items-center justify-center rounded-full"
+          style={{ backgroundColor: colors.card }}
+        >
           <Ionicons
             name="notifications-outline"
             size={24}
-            color="black"
+            color={colors.text}
           />
         </TouchableOpacity>
 
-        <TouchableOpacity className="h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+        <TouchableOpacity
+          className="h-12 w-12 items-center justify-center rounded-full"
+          style={{ backgroundColor: colors.card }}
+        >
           <Ionicons
             name="settings-outline"
             size={24}
-            color="black"
+            color={colors.text}
           />
         </TouchableOpacity>
       </View>

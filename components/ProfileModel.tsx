@@ -17,6 +17,7 @@ import {
 } from "@expo/vector-icons";
 
 import * as ImagePicker from "expo-image-picker";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   className?: string;
@@ -25,6 +26,7 @@ type Props = {
 const ProfileModal = ({
   className = "",
 }: Props) => {
+  const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
 
   const [selectedImage, setSelectedImage] =
@@ -63,12 +65,16 @@ const ProfileModal = ({
       {/* Pencil Button */}
       <Pressable
         onPress={() => setVisible(true)}
-        className="absolute bottom-0 right-0 z-50 h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-violet-500"
+        className="absolute bottom-0 right-0 z-50 h-10 w-10 items-center justify-center rounded-full border-2"
+        style={{
+          backgroundColor: colors.primary,
+          borderColor: colors.card,
+        }}
       >
         <Ionicons
           name="pencil"
           size={18}
-          color="white"
+          color={colors.buttonText}
         />
       </Pressable>
 
@@ -80,21 +86,28 @@ const ProfileModal = ({
         onRequestClose={() => setVisible(false)}
       >
         <View className="flex-1 items-center justify-center bg-black/50 px-6">
-          <View className="w-full rounded-3xl bg-white p-6">
+          <View
+            className="w-full rounded-3xl p-6"
+            style={{ backgroundColor: colors.card }}
+          >
             {/* Header */}
             <View className="mb-5 flex-row items-center justify-between">
-              <Text className="text-xl font-bold text-gray-900">
+              <Text
+                className="text-xl font-bold"
+                style={{ color: colors.text }}
+              >
                 Edit Profile
               </Text>
 
               <Pressable
                 onPress={() => setVisible(false)}
-                className="rounded-full bg-gray-100 p-2"
+                className="rounded-full p-2"
+                style={{ backgroundColor: colors.background }}
               >
                 <Ionicons
                   name="close"
                   size={20}
-                  color="black"
+                  color={colors.text}
                 />
               </Pressable>
             </View>
@@ -113,15 +126,19 @@ const ProfileModal = ({
               {/* Change Photo */}
               <Pressable
                 onPress={pickImage}
-                className="mt-4 flex-row items-center rounded-2xl bg-violet-500 px-5 py-3"
+                className="mt-4 flex-row items-center rounded-2xl px-5 py-3"
+                style={{ backgroundColor: colors.primary }}
               >
                 <Ionicons
                   name="image"
                   size={18}
-                  color="white"
+                  color={colors.buttonText}
                 />
 
-                <Text className="ml-2 font-semibold text-white">
+                <Text
+                  className="ml-2 font-semibold"
+                  style={{ color: colors.buttonText }}
+                >
                   Change Photo
                 </Text>
               </Pressable>
@@ -130,9 +147,13 @@ const ProfileModal = ({
             {/* Footer */}
             <Pressable
               onPress={() => setVisible(false)}
-              className="mt-8 items-center rounded-2xl bg-black py-3"
+              className="mt-8 items-center rounded-2xl py-3"
+              style={{ backgroundColor: colors.text }}
             >
-              <Text className="font-semibold text-white">
+              <Text
+                className="font-semibold"
+                style={{ color: colors.card }}
+              >
                 Save Changes
               </Text>
             </Pressable>

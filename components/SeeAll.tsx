@@ -19,6 +19,7 @@ import {
 import {
     Ionicons,
 } from "@expo/vector-icons";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props<T> = {
     title?: string;
@@ -54,6 +55,7 @@ const SeeAll = <T,>({
 }: Props<T>) => {
     const [visible, setVisible] =
         useState(false);
+    const { colors } = useTheme();
 
     return (
         <>
@@ -63,14 +65,17 @@ const SeeAll = <T,>({
                 onPress={() => setVisible(true)}
                 className="flex-row items-center gap-1"
             >
-                <Text className=" text-xl font-semibold text-blue-500">
+                <Text
+                    className=" text-xl font-semibold"
+                    style={{ color: colors.primary }}
+                >
                     See All
                 </Text>
 
                 <Ionicons
                     name="chevron-forward"
                     size={16}
-                    color="#3b82f6"
+                    color={colors.primary}
                 />
             </TouchableOpacity>
 
@@ -84,11 +89,18 @@ const SeeAll = <T,>({
                 }
             >
                 <View
-                    className={`flex-1 bg-white dark:bg-black ${className}`}
+                    className={`flex-1 ${className}`}
+                    style={{ backgroundColor: colors.background }}
                 >
                     {/* Header */}
-                    <View className="flex-row items-center justify-between border-b border-zinc-200 px-5 pb-4 pt-14 dark:border-zinc-800">
-                        <Text className="text-2xl font-bold text-black dark:text-white">
+                    <View
+                        className="flex-row items-center justify-between border-b px-5 pb-4 pt-14"
+                        style={{ borderBottomColor: colors.border }}
+                    >
+                        <Text
+                            className="text-2xl font-bold"
+                            style={{ color: colors.text }}
+                        >
                             {title}
                         </Text>
 
@@ -97,12 +109,13 @@ const SeeAll = <T,>({
                             onPress={() =>
                                 setVisible(false)
                             }
-                            className="h-10 w-10 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-900"
+                            className="h-10 w-10 items-center justify-center rounded-full"
+                            style={{ backgroundColor: colors.card }}
                         >
                             <Ionicons
                                 name="close"
                                 size={22}
-                                color="gray"
+                                color={colors.secondaryText}
                             />
                         </TouchableOpacity>
                     </View>

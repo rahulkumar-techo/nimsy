@@ -3,12 +3,14 @@ import { useEffect, useState } from "react"
 import { View, Text, Pressable, ActivityIndicator, Image } from "react-native"
 import { GoogleSignin } from "@react-native-google-signin/google-signin"
 import { useAuth } from "@/context/AuthContext"
+import { useTheme } from "@/context/ThemeContext"
 
 const webClientId = process.env.EXPO_PUBLIC_WEB_CLIENT_ID
 
 export default function UserAuth() {
   const [loading, setLoading] = useState(false)
   const { setUser } = useAuth()
+  const { colors } = useTheme()
 
   useEffect(() => {
     GoogleSignin.configure({
@@ -51,9 +53,17 @@ export default function UserAuth() {
           resizeMode="cover"
         />
 
-        <Text className="text-4xl font-extrabold text-slate-900">Nimsy</Text>
+        <Text
+          className="text-4xl font-extrabold"
+          style={{ color: colors.text }}
+        >
+          Nimsy
+        </Text>
 
-        <Text className="text-slate-500 mt-2 text-center px-6">
+        <Text
+          className="mt-2 text-center px-6"
+          style={{ color: colors.secondaryText }}
+        >
           Smart learning platform for students
         </Text>
       </View>
@@ -61,10 +71,11 @@ export default function UserAuth() {
       <Pressable
         onPress={handleLogin}
         disabled={loading}
-        className="w-full bg-blue-600 py-4 rounded-2xl items-center flex-row justify-center gap-3"
+        className="w-full py-4 rounded-2xl items-center flex-row justify-center gap-3"
+        style={{ backgroundColor: colors.primary }}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.buttonText} />
         ) : (
           <>
             <Image
@@ -73,7 +84,10 @@ export default function UserAuth() {
               }}
               className="w-5 h-5"
             />
-            <Text className="text-white text-[16px] font-semibold">
+            <Text
+              className="text-[16px] font-semibold"
+              style={{ color: colors.buttonText }}
+            >
               Continue with Google
             </Text>
           </>

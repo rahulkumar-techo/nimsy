@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   item: {
@@ -21,8 +22,13 @@ type Props = {
 const RecentReadCard = ({
   item,
 }: Props) => {
+  const { colors } = useTheme();
+
   return (
-    <TouchableOpacity className="mb-4 flex-row overflow-hidden rounded-[28px] bg-slate-50">
+    <TouchableOpacity
+      className="mb-4 flex-row overflow-hidden rounded-[28px]"
+      style={{ backgroundColor: colors.card }}
+    >
       <Image
         source={{
           uri: item.image,
@@ -31,21 +37,25 @@ const RecentReadCard = ({
       />
 
       <View className="flex-1 justify-center p-4">
-        <Text className="text-xl font-bold text-slate-900">
+        <Text className="text-xl font-bold" style={{ color: colors.text }}>
           {item.title}
         </Text>
 
-        <Text className="mt-2 text-slate-500">
+        <Text className="mt-2" style={{ color: colors.secondaryText }}>
           {item.progress}%
           completed
         </Text>
 
-        <View className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
+        <View
+          className="mt-4 h-2 overflow-hidden rounded-full"
+          style={{ backgroundColor: colors.border }}
+        >
           <View
             style={{
               width: `${item.progress}%`,
+              backgroundColor: colors.primary,
             }}
-            className="h-full rounded-full bg-violet-600"
+            className="h-full rounded-full"
           />
         </View>
       </View>

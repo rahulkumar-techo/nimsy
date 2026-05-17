@@ -6,6 +6,7 @@ import { View, Text, Pressable } from "react-native"
 import React from "react"
 import ContinueWatchingCard from "./ContinueWatchingCard"
 import { type ImageSourcePropType } from "react-native"
+import { useTheme } from "@/context/ThemeContext"
 
 type Item = {
   id: string
@@ -18,17 +19,22 @@ type Props = {
 }
 
 export default function ContinueWatchingSection({ data }: Props) {
+  const { colors } = useTheme()
+
   return (
     <View className="w-full">
 
       {/* Header */}
       <View className="mb-4 flex-row items-center justify-between">
-        <Text className="text-lg font-bold text-slate-900">
+        <Text className="text-lg font-bold" style={{ color: colors.text }}>
           Continue Watching
         </Text>
 
         <Pressable>
-          <Text className="text-blue-600 font-semibold">
+          <Text
+            className="font-semibold"
+            style={{ color: colors.primary }}
+          >
             See All
           </Text>
         </Pressable>

@@ -23,6 +23,7 @@ import RecentReads from "@/components/library/RecentReads";
 import Downloads from "@/components/library/Downloads";
 
 import Playlists from "@/components/library/Playlists";
+import { useTheme } from "@/context/ThemeContext";
 
 /* -------------------------------------------------------------------------- */
 /*                                   DATA                                     */
@@ -57,6 +58,7 @@ const topMenus = [
 /* -------------------------------------------------------------------------- */
 
 const LibraryScreen = () => {
+  const { colors } = useTheme();
   /* COLLECTIONS SECTION */
   const renderCollections = () => (
     <Collection />
@@ -79,12 +81,13 @@ const LibraryScreen = () => {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-white"
+      className="flex-1"
       edges={[
         "top",
         "left",
         "right",
       ]}
+      style={{ backgroundColor: colors.background }}
     >
       <ScrollView
         showsVerticalScrollIndicator={
@@ -97,11 +100,17 @@ const LibraryScreen = () => {
         {/* HEADER */}
         <View className="flex-row items-center justify-between px-5 pt-4">
           <View>
-            <Text className="text-5xl font-black text-slate-900">
+            <Text
+              className="text-5xl font-black"
+              style={{ color: colors.text }}
+            >
               Library
             </Text>
 
-            <Text className="mt-2 text-base text-slate-500">
+            <Text
+              className="mt-2 text-base"
+              style={{ color: colors.secondaryText }}
+            >
               Your stories,
               collections &
               downloads

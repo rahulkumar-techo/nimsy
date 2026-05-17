@@ -6,12 +6,12 @@
 import ExploreCategories from "@/components/explore/ExploreCategories"
 import ExploreContinueWatching from "@/components/explore/ExploreContinueWatching"
 import ExploreTopCategories from "@/components/explore/ExploreTopCategories"
-import CategoryChips, { type CategoryChip } from "@/components/home-comp/CategoriesChip"
-import ContinueWatchingSection from "@/components/home-comp/ContinueWatchingSection"
+import { type CategoryChip } from "@/components/home-comp/CategoriesChip"
 import FeatureCarousel from "@/components/home-comp/FeatureCarousel"
 import HomeSectionContainer from "@/components/home-comp/HomeSectionContainer"
 import NavHeader from "@/components/NavHeader"
 import { categories } from "@/constants/story"
+import { useTheme } from "@/context/ThemeContext"
 import { useRouter } from "expo-router"
 import { ScrollView, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
@@ -113,6 +113,7 @@ export const CONTINUE_DATA = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
 
   const handleCategory = (id: string, title: string) => {
     router.push({
@@ -120,9 +121,12 @@ export default function HomeScreen() {
       params: { id, title },
     });
   };
-
   return (
-    <SafeAreaView className="flex-1 bg-blue-50" edges={["top", "left", "right"]}>
+    <SafeAreaView
+      className="flex-1"
+      edges={["top", "left", "right"]}
+      style={{ backgroundColor: colors.background }}
+    >
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}

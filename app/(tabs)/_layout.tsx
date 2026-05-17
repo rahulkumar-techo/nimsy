@@ -7,9 +7,11 @@ import { useAuth } from "@/context/AuthContext";
 import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function TabsLayout() {
   const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth();
+  const { colors } = useTheme();
 
   const insets = useSafeAreaInsets();
 
@@ -30,8 +32,11 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
 
-        tabBarActiveTintColor: "#7C3AED",
-        tabBarInactiveTintColor: "#94A3B8",
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.secondaryText,
+        sceneStyle: {
+          backgroundColor: colors.background,
+        },
 
         tabBarStyle: {
           height: 60 + Math.max(insets.bottom, 8),
@@ -41,7 +46,11 @@ export default function TabsLayout() {
           borderTopWidth: 0,
           elevation: 0,
 
-          backgroundColor: "#ffffff",
+          backgroundColor: colors.card,
+          borderTopColor: colors.border,
+        },
+        tabBarLabelStyle: {
+          fontWeight: "600",
         },
       }}
     >
@@ -111,7 +120,7 @@ export default function TabsLayout() {
 
                   borderWidth: 2,
                   borderColor: focused
-                    ? "#7C3AED"
+                    ? colors.primary
                     : "transparent",
                 }}
               />

@@ -11,8 +11,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import VideoPlayer from "@/components/video/VideoPlayer";
 import { getStoryById } from "@/constants/story";
+import { useTheme } from "@/context/ThemeContext";
 
 const StoryDetailsScreen = () => {
+  const { colors, theme } = useTheme();
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
 
   const storyId = Array.isArray(id) ? id[0] : id;
@@ -21,8 +23,14 @@ const StoryDetailsScreen = () => {
 
   if (!story) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-black">
-        <Text className="text-white text-lg font-bold">
+      <SafeAreaView
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: colors.background }}
+      >
+        <Text
+          className="text-lg font-bold"
+          style={{ color: colors.text }}
+        >
           Story Not Found
         </Text>
       </SafeAreaView>
@@ -30,10 +38,13 @@ const StoryDetailsScreen = () => {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
+    >
       <StatusBar
-        barStyle="light-content"
-        backgroundColor="#000"
+        barStyle={theme === "light" ? "dark-content" : "light-content"}
+        backgroundColor={colors.background}
       />
 
       {/* VIDEO PLAYER */}
@@ -45,11 +56,17 @@ const StoryDetailsScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4 pt-5 pb-24">
-          <Text className="text-2xl font-black text-slate-900">
+          <Text
+            className="text-2xl font-black"
+            style={{ color: colors.text }}
+          >
             {story.title}
           </Text>
 
-          <Text className="mt-3 text-sm leading-7 text-slate-600">
+          <Text
+            className="mt-3 text-sm leading-7"
+            style={{ color: colors.secondaryText }}
+          >
             {story.story.intro}
           </Text>
         </View>

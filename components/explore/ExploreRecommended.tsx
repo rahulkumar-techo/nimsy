@@ -20,6 +20,7 @@ import {
 } from "@expo/vector-icons";
 
 import SeeAll from "../SeeAll";
+import { useTheme } from "@/context/ThemeContext";
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
@@ -55,6 +56,8 @@ const RecommendedCard = memo(
     onPress,
     fullWidth = false,
   }: CardProps) => {
+    const { colors } = useTheme();
+
     return (
       <TouchableOpacity
         activeOpacity={0.9}
@@ -65,9 +68,9 @@ const RecommendedCard = memo(
           mb-4
           overflow-hidden
           rounded-3xl
-          bg-gray-100
           ${fullWidth ? "w-full" : ""}
         `}
+        style={{ backgroundColor: colors.card }}
       >
 
         <View className="flex-row">
@@ -84,14 +87,15 @@ const RecommendedCard = memo(
           <View className="flex-1 justify-center p-4">
 
             {/* Title */}
-            <Text className="text-xl font-bold text-black">
+            <Text className="text-xl font-bold" style={{ color: colors.text }}>
               {item.title}
             </Text>
 
             {/* Description */}
             <Text
               numberOfLines={2}
-              className="mt-2 text-gray-500"
+              className="mt-2"
+              style={{ color: colors.secondaryText }}
             >
               {item.description}
             </Text>
@@ -102,10 +106,10 @@ const RecommendedCard = memo(
               <Ionicons
                 name="time-outline"
                 size={16}
-                color="gray"
+                color={colors.secondaryText}
               />
 
-              <Text className="ml-1 text-gray-500">
+              <Text className="ml-1" style={{ color: colors.secondaryText }}>
                 {item.duration}
               </Text>
 
@@ -129,6 +133,7 @@ RecommendedCard.displayName =
 
 const ExploreRecommended =
   ({ items }: Props) => {
+    const { colors } = useTheme();
 
     /**
      * Handle Card Press
@@ -173,7 +178,7 @@ const ExploreRecommended =
         {/* Header */}
         <View className="mb-4 flex-row items-center justify-between">
 
-          <Text className="text-xl font-bold text-black">
+          <Text className="text-xl font-bold" style={{ color: colors.text }}>
             Recommended For You
           </Text>
 

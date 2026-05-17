@@ -20,6 +20,7 @@ import {
 import ChildDashboard from "@/components/profile/child/ChildDashboard";
 
 import ParentDashboard from "@/components/profile/parent/ParentDashboard";
+import { useTheme } from "@/context/ThemeContext";
 
 const tabs = [
   {
@@ -37,15 +38,17 @@ const tabs = [
 const ProfileScreen = () => {
   const [activeTab, setActiveTab] =
     useState("child");
+  const { colors } = useTheme();
 
   return (
     <SafeAreaView
-         className="flex-1 bg-white"
+         className="flex-1"
          edges={[
            "top",
            "left",
            "right",
          ]}
+         style={{ backgroundColor: colors.background }}
        >
          <ScrollView
            showsVerticalScrollIndicator={
@@ -56,11 +59,17 @@ const ProfileScreen = () => {
            }}
          >
         <View className="px-5 pt-4">
-          <Text className="text-5xl font-black text-slate-900">
+          <Text
+            className="text-5xl font-black"
+            style={{ color: colors.text }}
+          >
             Profile
           </Text>
 
-          <Text className="mt-2 text-base text-slate-500">
+          <Text
+            className="mt-2 text-base"
+            style={{ color: colors.secondaryText }}
+          >
             Manage your
             learning &
             parental controls
@@ -79,18 +88,16 @@ const ProfileScreen = () => {
                 onPress={() =>
                   setActiveTab(tab.id)
                 }
-                className={`mr-4 flex-1 rounded-full px-5 py-4 ${
-                  active
-                    ? "bg-violet-600"
-                    : "bg-slate-100"
-                }`}
+                className="mr-4 flex-1 rounded-full px-5 py-4"
+                style={{
+                  backgroundColor: active ? colors.primary : colors.card,
+                }}
               >
                 <Text
-                  className={`text-center text-base font-bold ${
-                    active
-                      ? "text-white"
-                      : "text-slate-700"
-                  }`}
+                  className="text-center text-base font-bold"
+                  style={{
+                    color: active ? colors.buttonText : colors.text,
+                  }}
                 >
                   {tab.title}
                 </Text>

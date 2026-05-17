@@ -105,7 +105,7 @@ const VideoPlayer = ({ videoUrl, title }: Props) => {
         StatusBar.setHidden(false);
         setIsFullscreen(false);
       }
-    } catch (e) {
+    } catch {
       setIsFullscreen((s) => !s);
     }
     setShowControls(true);

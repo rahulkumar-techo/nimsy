@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   item: {
@@ -22,6 +23,8 @@ type Props = {
 const CollectionCard = ({
   item,
 }: Props) => {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -36,11 +39,11 @@ const CollectionCard = ({
       />
 
       <View className="p-5">
-        <Text className="text-2xl font-bold text-slate-900">
+        <Text className="text-2xl font-bold" style={{ color: colors.text }}>
           {item.title}
         </Text>
 
-        <Text className="mt-1 text-slate-500">
+        <Text className="mt-1" style={{ color: colors.secondaryText }}>
           {item.items}
         </Text>
       </View>

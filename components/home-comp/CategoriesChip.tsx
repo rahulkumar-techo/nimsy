@@ -7,6 +7,7 @@
 import { FlatList, Pressable, Text, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { Href, useRouter } from "expo-router"
+import { useTheme } from "@/context/ThemeContext"
 
 export type CategoryChip = {
   id: string
@@ -32,6 +33,7 @@ const CATEGORY_ROUTES: Record<string, Href> = {
 
 export default function CategoryChips({ data }: Props) {
   const router = useRouter()
+  const { colors } = useTheme()
 
   return (
     <FlatList
@@ -52,9 +54,11 @@ export default function CategoryChips({ data }: Props) {
               router.push(route)
             }
           }}
-          className="flex-row items-center px-4 py-3 rounded-2xl bg-white border border-gray-200"
+          className="flex-row items-center px-4 py-3 rounded-2xl border"
           style={{
-            shadowColor: "#000",
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            shadowColor: colors.shadow,
             shadowOpacity: 0.05,
             shadowRadius: 6,
             shadowOffset: { width: 0, height: 2 },
@@ -64,11 +68,14 @@ export default function CategoryChips({ data }: Props) {
           <Ionicons
             name={item.icon}
             size={18}
-            color="#334155"
+            color={colors.text}
             style={{ marginRight: 6 }}
           />
 
-          <Text className="text-sm font-semibold text-slate-800">
+          <Text
+            className="text-sm font-semibold"
+            style={{ color: colors.text }}
+          >
             {item.title}
           </Text>
         </Pressable>

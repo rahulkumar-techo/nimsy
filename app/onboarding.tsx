@@ -3,9 +3,11 @@ import Onboarding from "@/screens/onboarding"
 import { ActivityIndicator, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useAuth } from "@/context/AuthContext"
+import { useTheme } from "@/context/ThemeContext"
 
 export default function OnboardingRoute() {
   const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth()
+  const { colors } = useTheme()
 
   if (!user) {
     return <Redirect href="/" />
@@ -13,9 +15,12 @@ export default function OnboardingRoute() {
 
   if (!isOnboardingReady) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <View className="flex-1 items-center justify-center bg-white">
-          <ActivityIndicator size="large" color="#2563eb" />
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View
+          className="flex-1 items-center justify-center"
+          style={{ backgroundColor: colors.background }}
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     )

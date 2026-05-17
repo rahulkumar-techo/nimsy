@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import SeeAll from "../SeeAll";
+import { useTheme } from "@/context/ThemeContext";
 
 type ContinueItem = {
   id: string;
@@ -41,6 +42,7 @@ const ExploreContinueWatching = ({
   horizontal = false,
   scrollEnabled = true,
 }: Props) => {
+  const { colors } = useTheme();
 
   /* LIMITED DATA */
   const limitedData =
@@ -59,14 +61,13 @@ const ExploreContinueWatching = ({
       className={`
         overflow-hidden
         rounded-3xl
-        bg-gray-100
-        
         ${
           horizontal
             ? "w-[280px]"
             : "w-full"
         }
       `}
+      style={{ backgroundColor: colors.card }}
     >
       {/* Thumbnail */}
       <Image
@@ -89,7 +90,8 @@ const ExploreContinueWatching = ({
 
         <Text
           numberOfLines={1}
-          className="text-xl font-bold text-black"
+          className="text-xl font-bold"
+          style={{ color: colors.text }}
         >
           {item.title}
         </Text>
@@ -97,24 +99,28 @@ const ExploreContinueWatching = ({
         {/* Meta */}
         <View className="mt-2 flex-row items-center justify-between">
 
-          <Text className="text-gray-500">
+          <Text style={{ color: colors.secondaryText }}>
             {item.progress}% watched
           </Text>
 
-          <Text className="text-gray-500">
+          <Text style={{ color: colors.secondaryText }}>
             {item.duration}
           </Text>
 
         </View>
 
         {/* Progress */}
-        <View className="mt-4 h-2 overflow-hidden rounded-full bg-gray-300">
+        <View
+          className="mt-4 h-2 overflow-hidden rounded-full"
+          style={{ backgroundColor: colors.border }}
+        >
 
           <View
             style={{
               width: `${item.progress}%`,
+              backgroundColor: colors.primary,
             }}
-            className="h-full rounded-full bg-violet-600"
+            className="h-full rounded-full"
           />
 
         </View>
@@ -129,7 +135,7 @@ const ExploreContinueWatching = ({
       {/* Header */}
       <View className="mb-4 flex-row items-center justify-between">
 
-        <Text className="text-xl font-bold text-black">
+        <Text className="text-xl font-bold" style={{ color: colors.text }}>
           Continue Watching
         </Text>
 

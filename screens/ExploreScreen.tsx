@@ -44,6 +44,7 @@ import ExplorePopularSearches from "../components/explore/ExplorePopularSearches
 import ExploreRecommended from "../components/explore/ExploreRecommended";
 import ExploreSearch from "../components/explore/ExploreSearch";
 import ExploreTopCategories from "../components/explore/ExploreTopCategories";
+import { useTheme } from "@/context/ThemeContext";
 
 
 type CategoryItem = {
@@ -142,14 +143,9 @@ const recommended: RecommendedItem[] = [
   },
 ];
 
-const ageGroups = [
-  "3-5",
-  "6-8",
-  "9+",
-];
-
 const ExploreScreen = () => {
   const router = useRouter();
+  const { colors } = useTheme();
 
   const [search, setSearch] =
     useState("");
@@ -202,12 +198,13 @@ const ExploreScreen = () => {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-white"
+      className="flex-1"
       edges={[
         "top",
         "left",
         "right",
       ]}
+      style={{ backgroundColor: colors.background }}
     >
       <ScrollView
         showsVerticalScrollIndicator={
@@ -257,15 +254,21 @@ const ExploreScreen = () => {
                     <Ionicons
                       name="search-outline"
                       size={70}
-                      color="#CBD5E1"
+                      color={colors.border}
                     />
 
-                    <Text className="mt-5 text-lg font-semibold text-gray-500">
+                    <Text
+                      className="mt-5 text-lg font-semibold"
+                      style={{ color: colors.secondaryText }}
+                    >
                       No results
                       found
                     </Text>
 
-                    <Text className="mt-2 text-center text-sm text-gray-400">
+                    <Text
+                      className="mt-2 text-center text-sm"
+                      style={{ color: colors.secondaryText }}
+                    >
                       Try another
                       keyword
                     </Text>

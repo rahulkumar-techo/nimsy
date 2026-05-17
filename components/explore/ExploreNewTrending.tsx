@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import SeeAll from "../SeeAll";
+import { useTheme } from "@/context/ThemeContext";
 
 type Item = {
   title: string;
@@ -28,6 +29,7 @@ type Props = {
 const ExploreNewTrending = ({
   items
 }: Props) => {
+  const { colors } = useTheme();
 
   /**
    * Render Item
@@ -98,7 +100,7 @@ const renderItem = ({
       {/* Header */}
       <View className="mb-4 flex-row items-center justify-between">
 
-        <Text className="text-xl font-bold text-black">
+        <Text className="text-xl font-bold" style={{ color: colors.text }}>
           New & Trending
         </Text>
 
