@@ -2,15 +2,13 @@
  * Parent Dashboard
  */
 
-import React from "react";
 
 import {
-  View,
+    View,
 } from "react-native";
 
-import SectionHeader from "../SectionHeader";
 
-import ParentControlCard from "./ParentControlCard";
+import ParentControlsSection from "./ParentControlsSection";
 
 const PARENT_CONTROLS = [
   {
@@ -39,17 +37,7 @@ const PARENT_CONTROLS = [
 const ParentDashboard = () => {
   return (
     <View className="px-5 pb-20">
-      <SectionHeader title="Parent Controls" />
-
-      {PARENT_CONTROLS.map((control) => (
-        <ParentControlCard
-          key={control.id}
-          title={control.title}
-          subtitle={control.subtitle}
-          status={control.status}
-          icon={control.icon}
-        />
-      ))}
+      <ParentControlsSection />
     </View>
   );
 };

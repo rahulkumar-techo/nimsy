@@ -2,24 +2,18 @@
  * Child Dashboard
  */
 
-import React from "react";
 
 import {
-  ScrollView,
-  View,
+    View
 } from "react-native";
 
 import ProfileHeader from "../ProfileHeader";
 
 import StatsCard from "./StatsCard";
 
-import SectionHeader from "../SectionHeader";
-
-import AchievementCard from "./AchievementCard";
-
-import FavoriteCard from "./FavoriteCard";
-
-import DownloadItem from "./DownloadItem";
+import AchievementsSection from "./AchievementsSection";
+import DownloadSection from "./DownloadSection";
+import FavoritesSection from "./FavoritesSection";
 
 type Achievement = {
   id: string;
@@ -62,47 +56,9 @@ const ChildDashboard = () => {
         streak="23"
       />
 
-      <SectionHeader title="Achievements" />
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={
-          false
-        }
-      >
-        {ACHIEVEMENTS.map((item) => (
-          <AchievementCard
-            key={item.id}
-            title={item.title}
-            subtitle={item.subtitle}
-            emoji={item.emoji}
-          />
-        ))}
-      </ScrollView>
-
-      <SectionHeader title="My Favorites" />
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={
-          false
-        }
-      >
-        {FAVORITES.map((item) => (
-          <FavoriteCard
-            key={item.id}
-            title={item.title}
-            image={item.image}
-          />
-        ))}
-      </ScrollView>
-
-      <SectionHeader title="Downloads" />
-
-      <DownloadItem
-        title="Magic Forest"
-        type="Story"
-      />
+      <AchievementsSection />
+      <FavoritesSection />
+      <DownloadSection />
     </View>
   );
 };
