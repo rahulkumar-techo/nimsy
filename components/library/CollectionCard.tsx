@@ -2,13 +2,12 @@
  * Collection Card Component
  */
 
-import React from "react";
 
 import {
-  Image,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 type Props = {
@@ -49,6 +48,4 @@ const CollectionCard = ({
   );
 };
 
-export default React.memo(
-  CollectionCard
-);
+export default CollectionCard;

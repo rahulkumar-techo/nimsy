@@ -1,37 +1,87 @@
 /**
- * Section Header Component
+ * Optimized Section Header
  */
 
-import React from "react";
+import {
+  memo,
+  useCallback,
+} from "react";
 
 import {
+  ListRenderItem,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
-type Props = {
+import SeeAll from "../SeeAll";
+
+type Props<T> = {
   title: string;
+  data?: T[];
+  renderItem?: ListRenderItem<T>;
+  keyExtractor?: (
+    item: T,
+    index: number
+  ) => string;
+  horizontal?: boolean;
+  onSeeAll?: () => void;
 };
 
-const SectionHeader = ({
+const SectionHeader = <T,>({
   title,
-}: Props) => {
+  data,
+  renderItem,
+  keyExtractor,
+  horizontal,
+  onSeeAll,
+}: Props<T>) => {
+  /* SEE ALL VISIBILITY */
+  const showModalSeeAll =
+    !!data &&
+    !!renderItem;
+
+  /* DEFAULT KEY EXTRACTOR */
+  const defaultKeyExtractor =
+    useCallback(
+      (
+        item: any,
+        index: number
+      ) =>
+        item?.id?.toString?.() ??
+        index.toString(),
+      []
+    );
+
   return (
     <View className="mb-5 flex-row items-center justify-between px-5">
       <Text className="text-3xl font-black text-slate-900">
         {title}
       </Text>
 
-      <TouchableOpacity>
-        <Text className="text-base font-bold text-violet-600">
-          See All
-        </Text>
-      </TouchableOpacity>
+      {showModalSeeAll ? (
+        <SeeAll
+          title={title}
+          data={data}
+          renderItem={renderItem}
+          keyExtractor={
+            keyExtractor ??
+            defaultKeyExtractor
+          }
+          horizontal={horizontal}
+        />
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={onSeeAll}
+        >
+          <Text className="text-base font-bold text-violet-600">
+            See All
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
 
-export default React.memo(
-  SectionHeader
-);
+export default memo(SectionHeader) as typeof SectionHeader;

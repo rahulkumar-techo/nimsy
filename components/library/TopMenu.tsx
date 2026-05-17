@@ -2,7 +2,6 @@
  * Top Menu Component
  */
 
-import React from "react";
 
 import {
   Text,
@@ -44,6 +43,4 @@ const TopMenu = ({
   );
 };
 
-export default React.memo(
-  TopMenu
-);
+export default TopMenu;

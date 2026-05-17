@@ -2,16 +2,15 @@
  * Download Card Component
  */
 
-import React from "react";
 
 import {
-  Text,
-  TouchableOpacity,
-  View,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import {
-  Ionicons,
+    Ionicons,
 } from "@expo/vector-icons";
 
 type Props = {
@@ -47,6 +46,4 @@ const DownloadCard = ({
   );
 };
 
-export default React.memo(
-  DownloadCard
-);
+export default DownloadCard;

@@ -2,7 +2,7 @@
  * Explore Screen
  */
 
-import React, {
+import {
   useMemo,
   useState,
 } from "react";
@@ -33,6 +33,7 @@ import {
   CONTINUE_DATA,
 } from "./home";
 
+import SearchCard from "@/components/SearchCard";
 import ExploreAudioStories from "../components/explore/ExploreAudioStories";
 import ExploreByAge from "../components/explore/ExploreByAge";
 import ExploreCategories from "../components/explore/ExploreCategories";
@@ -43,7 +44,6 @@ import ExplorePopularSearches from "../components/explore/ExplorePopularSearches
 import ExploreRecommended from "../components/explore/ExploreRecommended";
 import ExploreSearch from "../components/explore/ExploreSearch";
 import ExploreTopCategories from "../components/explore/ExploreTopCategories";
-import SearchCard from "@/components/SearchCard";
 
 
 type CategoryItem = {
@@ -64,6 +64,7 @@ type TrendingItem = {
 };
 
 type RecommendedItem = {
+  id: string;
   title: string;
   description: string;
   image: string;
@@ -122,6 +123,7 @@ const trending: TrendingItem[] = [
 
 const recommended: RecommendedItem[] = [
   {
+    id: "1",
     title: "The Honest Rabbit",
     description:
       "A fun moral story for children.",
@@ -130,6 +132,7 @@ const recommended: RecommendedItem[] = [
     duration: "5 mins",
   },
   {
+    id: "2",
     title: "The Friendly Owl",
     description:
       "A bedtime tale about kindness.",

@@ -2,7 +2,6 @@
  * Recent Read Card Component
  */
 
-import React from "react";
 
 import {
   Image,
@@ -54,6 +53,4 @@ const RecentReadCard = ({
   );
 };
 
-export default React.memo(
-  RecentReadCard
-);
+export default RecentReadCard;

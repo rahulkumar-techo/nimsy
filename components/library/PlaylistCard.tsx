@@ -2,7 +2,6 @@
  * Playlist Card Component
  */
 
-import React from "react";
 
 import {
   Text,
@@ -55,6 +54,4 @@ const PlaylistCard = ({
   );
 };
 
-export default React.memo(
-  PlaylistCard
-);
+export default PlaylistCard;
