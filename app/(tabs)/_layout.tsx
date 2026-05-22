@@ -8,6 +8,7 @@ import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useTheme } from "@/context/ThemeContext";
+import UserAuth from "@/components/UserAuth";
 
 export default function TabsLayout() {
   const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth();
@@ -20,7 +21,7 @@ export default function TabsLayout() {
   }
 
   if (!isOnboardingReady) {
-    return null;
+    return <UserAuth/>;
   }
 
   if (!hasCompletedOnboarding) {
@@ -103,6 +104,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: "Profile",
+          
 
           tabBarIcon: ({ color, size, focused }) =>
             user?.photo ? (
