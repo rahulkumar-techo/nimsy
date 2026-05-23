@@ -1,104 +1,187 @@
 /**
- * Child Profile Screen
+ * Child Profile Component
+ * Displays child avatar, achievements, and profile menu items
  */
 
+import React from "react";
+
 import {
-  ScrollView,
-  Text,
-  View,
+    Image,
+    ScrollView,
+    Text,
+    View,
 } from "react-native";
 
-import AchievementBadge from "./AchievementBadge";
-import MenuItem from "./MenuItem";
+import { Ionicons } from "@expo/vector-icons";
+
+import { useTheme } from "@/context/ThemeContext";
+
+import AchievementBadge from "@/components/profile/AchievementBadge";
+import MenuItem from "@/components/profile/MenuItem";
+import ProfileModal from "@/components/ProfileModel";
+
+const CHILD_NAME = "Aarav";
+const CHILD_AGE = "6 years";
+const CHILD_AVATAR =
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e";
+
+const ACHIEVEMENTS = [
+  { emoji: "⭐", title: "Story Star" },
+  { emoji: "📚", title: "Bookworm" },
+  { emoji: "🎧", title: "Listener" },
+  { emoji: "🏆", title: "Champion" },
+];
+
+const MENU_ITEMS = [
+  { title: "My Favorites", icon: "heart" as const, link: "/favorites" as const },
+  { title: "My Stories", icon: "book" as const, link: "/stories" as const },
+  { title: "Downloads", icon: "download" as const, link: "/library" as const },
+  { title: "Watch History", icon: "time" as const },
+  { title: "Settings", icon: "settings" as const, link: "/userdetails" as const },
+];
 
 const ChildProfile = () => {
+  const { colors } = useTheme();
+
   return (
-    <ScrollView className="flex-1 bg-[#F7F8FD]">
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 40 }}
+    >
+      {/* ── Profile Header ── */}
+      <View className="items-center pt-4 pb-6">
+        {/* Avatar */}
+        <View className="relative">
+          <Image
+            source={{ uri: CHILD_AVATAR }}
+            className="h-28 w-28 rounded-full border-4"
+            style={{ borderColor: colors.primary }}
+          />
 
-      <View className="bg-[#6A5CFF] rounded-b-[50px] pt-16 pb-10 px-5">
-
-        <View className="items-center">
-
-          <View className="w-32 h-32 rounded-full bg-white" />
-
-          <Text className="text-white text-4xl font-bold mt-5">
-            Aarav
-          </Text>
-
-          <Text className="text-indigo-100 mt-2">
-            Level 2
-          </Text>
-
-          <View className="w-full h-3 bg-indigo-300 rounded-full mt-6">
-            <View className="w-1/2 h-3 bg-yellow-400 rounded-full" />
-          </View>
-
-          <Text className="text-white mt-2">
-            120 / 200
-          </Text>
-
+          <ProfileModal className="absolute -bottom-1 -right-1" />
         </View>
 
-      </View>
-
-      <View className="px-5 mt-8">
-
-        <Text className="text-2xl font-bold mb-5">
-          Achievements
+        {/* Name & Age */}
+        <Text
+          className="mt-4 text-3xl font-extrabold"
+          style={{ color: colors.text }}
+        >
+          {CHILD_NAME}
         </Text>
 
-        <View className="flex-row justify-between mb-8">
-          <AchievementBadge
-            emoji="⭐"
-            title="First Story"
+        <Text
+          className="mt-1 text-base"
+          style={{ color: colors.secondaryText }}
+        >
+          {CHILD_AGE}
+        </Text>
+
+        {/* Stats Row */}
+        <View className="mt-5 flex-row">
+          <View className="items-center px-6">
+            <Text
+              className="text-2xl font-extrabold"
+              style={{ color: colors.primary }}
+            >
+              12
+            </Text>
+            <Text
+              className="mt-1 text-sm"
+              style={{ color: colors.secondaryText }}
+            >
+              Stories
+            </Text>
+          </View>
+
+          <View
+            className="w-px h-10 self-center"
+            style={{ backgroundColor: colors.border }}
           />
 
-          <AchievementBadge
-            emoji="🏆"
-            title="5 Stories"
+          <View className="items-center px-6">
+            <Text
+              className="text-2xl font-extrabold"
+              style={{ color: colors.primary }}
+            >
+              4
+            </Text>
+            <Text
+              className="mt-1 text-sm"
+              style={{ color: colors.secondaryText }}
+            >
+              Hours
+            </Text>
+          </View>
+
+          <View
+            className="w-px h-10 self-center"
+            style={{ backgroundColor: colors.border }}
           />
 
-          <AchievementBadge
-            emoji="🔥"
-            title="7 Day Streak"
-          />
-
-          <AchievementBadge
-            emoji="❄️"
-            title="Explorer"
-          />
+          <View className="items-center px-6">
+            <Text
+              className="text-2xl font-extrabold"
+              style={{ color: colors.primary }}
+            >
+              7
+            </Text>
+            <Text
+              className="mt-1 text-sm"
+              style={{ color: colors.secondaryText }}
+            >
+              Badges
+            </Text>
+          </View>
         </View>
-
-        <MenuItem
-          title="My Favorites"
-          icon="heart-outline"
-      
-        />
-
-        <MenuItem
-          title="Downloaded"
-          icon="download-outline"
-        />
-
-        <MenuItem
-          title="Recently Viewed"
-          icon="time-outline"
-        />
-
-        <MenuItem
-          title="Progress"
-          icon="stats-chart-outline"
-        />
-
-        <MenuItem
-          title="Certificates"
-          icon="ribbon-outline"
-        />
-
       </View>
 
+      {/* ── Achievements Section ── */}
+      <View className="mx-5 mb-6 rounded-3xl p-5" style={{ backgroundColor: colors.card }}>
+        <View className="flex-row items-center justify-between mb-4">
+          <Text
+            className="text-lg font-extrabold"
+            style={{ color: colors.text }}
+          >
+            Achievements
+          </Text>
+
+          <View className="flex-row items-center">
+            <Ionicons name="trophy" size={16} color={colors.primary} />
+            <Text
+              className="ml-1 text-sm font-semibold"
+              style={{ color: colors.primary }}
+            >
+              View All
+            </Text>
+          </View>
+        </View>
+
+        <View className="flex-row justify-between">
+          {ACHIEVEMENTS.map((item) => (
+            <AchievementBadge
+              key={item.title}
+              emoji={item.emoji}
+              title={item.title}
+            />
+          ))}
+        </View>
+      </View>
+
+      {/* ── Menu Items ── */}
+      <View className="mx-5">
+        <Text
+          className="text-lg font-extrabold mb-4"
+          style={{ color: colors.text }}
+        >
+          Quick Actions
+        </Text>
+
+        {MENU_ITEMS.map((item) => (
+          <MenuItem key={item.title} title={item.title} icon={item.icon} link={item.link} />
+        ))}
+      </View>
     </ScrollView>
   );
 };
 
-export default ChildProfile;
+export default React.memo(ChildProfile);
