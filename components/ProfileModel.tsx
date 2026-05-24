@@ -21,10 +21,12 @@ import { useTheme } from "@/context/ThemeContext";
 
 type Props = {
   className?: string;
+  image?:string;
 };
 
 const ProfileModal = ({
   className = "",
+  image
 }: Props) => {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
@@ -118,7 +120,7 @@ const ProfileModal = ({
                 source={{
                   uri:
                     selectedImage ||
-                    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
+                    (image||"https://images.unsplash.com/photo-1500648767791-00dcc994a43e"),
                 }}
                 className="h-28 w-28 rounded-full border-4 border-violet-400"
               />

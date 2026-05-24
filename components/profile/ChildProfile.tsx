@@ -6,10 +6,10 @@
 import React from "react";
 
 import {
-    Image,
-    ScrollView,
-    Text,
-    View,
+  Image,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +19,8 @@ import { useTheme } from "@/context/ThemeContext";
 import AchievementBadge from "@/components/profile/AchievementBadge";
 import MenuItem from "@/components/profile/MenuItem";
 import ProfileModal from "@/components/ProfileModel";
+import { Href } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
 
 const CHILD_NAME = "Aarav";
 const CHILD_AGE = "6 years";
@@ -35,14 +37,14 @@ const ACHIEVEMENTS = [
 const MENU_ITEMS = [
   { title: "My Favorites", icon: "heart" as const, link: "/favorites" as const },
   { title: "My Stories", icon: "book" as const, link: "/stories" as const },
-  { title: "Downloads", icon: "download" as const, link: "/library" as const },
+  { title: "Downloads", icon: "download" as const, link: "/downloads" as Href },
   { title: "Watch History", icon: "time" as const },
   { title: "Settings", icon: "settings" as const, link: "/userdetails" as const },
 ];
 
 const ChildProfile = () => {
   const { colors } = useTheme();
-
+  const { user } = useAuth();
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
@@ -53,12 +55,14 @@ const ChildProfile = () => {
         {/* Avatar */}
         <View className="relative">
           <Image
-            source={{ uri: CHILD_AVATAR }}
+            source={{ uri: user?.photo || CHILD_AVATAR }}
             className="h-28 w-28 rounded-full border-4"
             style={{ borderColor: colors.primary }}
           />
 
-          <ProfileModal className="absolute -bottom-1 -right-1" />
+          <ProfileModal className="absolute -bottom-1 -right-1"
+          image={user?.photo}
+          />
         </View>
 
         {/* Name & Age */}
@@ -66,11 +70,11 @@ const ChildProfile = () => {
           className="mt-4 text-3xl font-extrabold"
           style={{ color: colors.text }}
         >
-          {CHILD_NAME}
+          {user?.name || CHILD_NAME}
         </Text>
 
         <Text
-          className="mt-1 text-base"
+          className="mt-1 text-base" 
           style={{ color: colors.secondaryText }}
         >
           {CHILD_AGE}
