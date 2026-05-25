@@ -1,5 +1,4 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import React from "react";
 import {
   Text,
@@ -10,6 +9,7 @@ import {
 import type { Story } from "@/constants/story";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/context/ThemeContext";
+import { openStoryVideo } from "@/utils/videoNavigation";
 
 const CATEGORY_STYLES: Record<
   string,
@@ -54,7 +54,7 @@ const StoryCard = ({ item }: { item: Story }) => {
       return;
     }
 
-    (router as any).push(`/stories/${item.id}`);
+    openStoryVideo(item);
   };
 
   return (

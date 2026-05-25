@@ -10,7 +10,8 @@ interface ContainerProps {
   title: string
   subtitle: string
   icon: keyof typeof Ionicons.glyphMap
-  children?: ReactNode
+  children?: ReactNode,
+  className?:string
 }
 
 const ICON_SIZES = {
@@ -25,6 +26,7 @@ const Container = memo(function Container({
   subtitle,
   icon,
   children,
+  className
 }: ContainerProps) {
   const { colors } = useTheme()
 
@@ -37,7 +39,7 @@ const Container = memo(function Container({
       className="flex-1"
       style={{ backgroundColor: colors.background }}
     >
-      <View className="flex-1 px-6 pt-6">
+      <View className={className}>
         {wantBackBtn && (
           <Pressable
             onPress={handleBackPress}

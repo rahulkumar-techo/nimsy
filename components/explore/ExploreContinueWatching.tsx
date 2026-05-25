@@ -14,6 +14,7 @@ import {
 
 import SeeAll from "../SeeAll";
 import { useTheme } from "@/context/ThemeContext";
+import { durationToSeconds, openVideoPlayer } from "@/utils/videoNavigation";
 
 type ContinueItem = {
   id: string;
@@ -21,6 +22,7 @@ type ContinueItem = {
   image: string;
   progress: number;
   duration: string;
+  videoUrl?: string;
 };
 
 type Props = {
@@ -58,6 +60,17 @@ const ExploreContinueWatching = ({
   }) => (
     <TouchableOpacity
       activeOpacity={0.9}
+      onPress={() => {
+        if (!item.videoUrl) return;
+
+        openVideoPlayer({
+          id: item.id,
+          title: item.title,
+          url: item.videoUrl,
+          thumbnail: item.image,
+          duration: durationToSeconds(item.duration),
+        });
+      }}
       className={`
         overflow-hidden
         rounded-3xl

@@ -30,13 +30,9 @@ const MenuItem = ({
   const router = useRouter();
 
   const handleRedirect = () => {
-    const destination =
-      link ?? {
-        pathname: "/profile/[id]",
-        params: { id: title },
-      };
+    if (!link) return;
 
-    router.push(destination);
+    router.push(link);
   };
 
   return (

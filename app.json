@@ -3,7 +3,7 @@
     "name": "nimsy",
     "slug": "nimsy",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/branding/nimsy-logo.png",
     "scheme": "com.rahul.nimsyclient",
     "userInterfaceStyle": "automatic",
@@ -55,6 +55,12 @@
       ],
       "expo-audio",
       "expo-video",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ],
       "expo-web-browser",
       "expo-asset",
       "expo-secure-store"

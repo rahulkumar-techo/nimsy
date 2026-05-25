@@ -1,6 +1,4 @@
-import React from "react";
 import {
-  ScrollView,
   StatusBar,
   Text,
   View,
@@ -9,9 +7,10 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import VideoPlayer from "@/components/video/VideoPlayer";
+import VideoCard from "@/components/VideoCard";
 import { getStoryById } from "@/constants/story";
 import { useTheme } from "@/context/ThemeContext";
+import { storyToVideoItem } from "@/utils/videoNavigation";
 
 const StoryDetailsScreen = () => {
   const { colors, theme } = useTheme();
@@ -38,42 +37,31 @@ const StoryDetailsScreen = () => {
   }
 
   return (
-    <SafeAreaView
-      className="flex-1"
-      style={{ backgroundColor: colors.background }}
-    >
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
       <StatusBar
         barStyle={theme === "light" ? "dark-content" : "light-content"}
         backgroundColor={colors.background}
       />
 
-      {/* VIDEO PLAYER */}
-      <VideoPlayer videoUrl={story.videoUrl} />
+      <View className="px-5 pt-5">
+        <VideoCard
+          video={storyToVideoItem(story)}
+        />
 
-      {/* DETAILS */}
-      <ScrollView
-        className="flex-1"
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="px-4 pt-5 pb-24">
-          <Text
-            className="text-2xl font-black"
-            style={{ color: colors.text }}
-          >
-            {story.title}
-          </Text>
-
-          <Text
-            className="mt-3 text-sm leading-7"
-            style={{ color: colors.secondaryText }}
-          >
-            {story.story.intro}
-          </Text>
-        </View>
-      </ScrollView>
-
-      {/* settings removed — returning to previous state with no settings UI */}
-    </SafeAreaView>
+        <Text
+          className="mt-2 text-2xl font-black"
+          style={{ color: colors.text }}
+        >
+          {story.title}
+        </Text>
+        <Text
+          className="mt-2 text-base leading-6"
+          style={{ color: colors.secondaryText }}
+        >
+          {story.story.intro}
+        </Text>
+      </View>
+    </View>
   );
 };
 

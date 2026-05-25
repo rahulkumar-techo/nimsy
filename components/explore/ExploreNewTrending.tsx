@@ -14,10 +14,14 @@ import {
 
 import SeeAll from "../SeeAll";
 import { useTheme } from "@/context/ThemeContext";
+import { durationToSeconds, openVideoPlayer } from "@/utils/videoNavigation";
 
 type Item = {
+  id?: string;
   title: string;
   image: string;
+  duration?: string;
+  videoUrl?: string;
 };
 
 type Props = {
@@ -43,6 +47,17 @@ const renderItem = ({
 }) => (
   <TouchableOpacity
     activeOpacity={0.9}
+    onPress={() => {
+      if (!item.videoUrl) return;
+
+      openVideoPlayer({
+        id: item.id ?? item.title,
+        title: item.title,
+        url: item.videoUrl,
+        thumbnail: item.image,
+        duration: durationToSeconds(item.duration),
+      });
+    }}
     className={`
       overflow-hidden
       rounded-3xl
@@ -86,7 +101,7 @@ const renderItem = ({
       </Text>
 
       <Text className="mt-1 text-gray-200">
-        7 mins read
+        {item.duration ?? "7 mins"}
       </Text>
 
     </View>

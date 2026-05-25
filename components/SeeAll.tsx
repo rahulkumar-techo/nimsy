@@ -124,7 +124,15 @@ const SeeAll = <T,>({
                     <FlatList
                         horizontal={horizontal}
                         data={data.slice(0, limit)}
-                        renderItem={renderItem}
+                        renderItem={(info) => (
+                            <View
+                                onTouchEndCapture={() =>
+                                    setVisible(false)
+                                }
+                            >
+                                {renderItem(info)}
+                            </View>
+                        )}
                         keyExtractor={
                             keyExtractor ||
                             ((_, index) =>

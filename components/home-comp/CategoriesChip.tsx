@@ -13,6 +13,7 @@ export type CategoryChip = {
   id: string
   title: string
   icon: keyof typeof Ionicons.glyphMap
+  route:Href
 }
 
 type Props = {

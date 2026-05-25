@@ -21,6 +21,7 @@ import {
 
 import SeeAll from "../SeeAll";
 import { useTheme } from "@/context/ThemeContext";
+import { durationToSeconds, openVideoPlayer } from "@/utils/videoNavigation";
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
@@ -32,6 +33,7 @@ type RecommendedItem = {
   description: string;
   image: string;
   duration: string;
+  videoUrl?: string;
 };
 
 type Props = {
@@ -143,10 +145,15 @@ const ExploreRecommended =
         (
           item: RecommendedItem
         ) => {
-          console.log(
-            "Selected:",
-            item.title
-          );
+          if (!item.videoUrl) return;
+
+          openVideoPlayer({
+            id: item.id,
+            title: item.title,
+            url: item.videoUrl,
+            thumbnail: item.image,
+            duration: durationToSeconds(item.duration),
+          });
         },
         []
       );

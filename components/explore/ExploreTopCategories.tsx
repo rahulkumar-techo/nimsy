@@ -57,10 +57,10 @@ const ExploreTopCategories = ({ items, onItemPress }: Props) =>{
     </View>
 
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      {items.slice(0,5).map((item, index) => (
+      {items.slice(0,5).map((item) => (
          <CategoryCard
             
-            key={item.id+Date.now().toString()}
+            key={item.id ?? item.title}
             {...item}
             onPress={() => handleCategory(item.title, item.id as any)}
           />

@@ -18,6 +18,7 @@ import {
 } from "react-native-safe-area-context";
 
 import {
+  type Href,
   useRouter,
 } from "expo-router";
 
@@ -27,6 +28,7 @@ import {
 
 import {
   categories as storyCategories,
+  stories,
 } from "@/constants/story";
 
 import {
@@ -50,6 +52,7 @@ import { useTheme } from "@/context/ThemeContext";
 type CategoryItem = {
   title: string;
   icon: string;
+  route: Href;
 };
 
 type TopCategoryItem = {
@@ -60,8 +63,11 @@ type TopCategoryItem = {
 };
 
 type TrendingItem = {
+  id: string;
   title: string;
   image: string;
+  duration: string;
+  videoUrl: string;
 };
 
 type RecommendedItem = {
@@ -70,24 +76,29 @@ type RecommendedItem = {
   description: string;
   image: string;
   duration: string;
+  videoUrl: string;
 };
 
 const categories: CategoryItem[] = [
   {
     title: "Stories",
     icon: "book",
+    route: "/stories",
   },
   {
     title: "Videos",
     icon: "play-circle",
+    route: "/videos",
   },
   {
     title: "Audio",
     icon: "headset",
+    route: "/audio",
   },
   {
     title: "Learning",
     icon: "school",
+    route: "/category",
   },
 ];
 
@@ -109,39 +120,25 @@ const topCategories: TopCategoryItem[] =
       count: category.stories.length,
     }));
 
-const trending: TrendingItem[] = [
-  {
-    title: "Magic Forest",
-    image:
-      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e",
-  },
-  {
-    title: "The Clever Fox",
-    image:
-      "https://images.unsplash.com/photo-1474511320723-9a56873867b5",
-  },
-];
+const trending: TrendingItem[] = stories
+  .filter((story) => story.featured)
+  .slice(0, 4)
+  .map((story) => ({
+    id: story.id,
+    title: story.title,
+    image: story.thumbnail,
+    duration: story.duration,
+    videoUrl: story.videoUrl,
+  }));
 
-const recommended: RecommendedItem[] = [
-  {
-    id: "1",
-    title: "The Honest Rabbit",
-    description:
-      "A fun moral story for children.",
-    image:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9",
-    duration: "5 mins",
-  },
-  {
-    id: "2",
-    title: "The Friendly Owl",
-    description:
-      "A bedtime tale about kindness.",
-    image:
-      "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
-    duration: "6 mins",
-  },
-];
+const recommended: RecommendedItem[] = stories.slice(0, 4).map((story) => ({
+  id: story.id,
+  title: story.title,
+  description: story.story.intro,
+  image: story.thumbnail,
+  duration: story.duration,
+  videoUrl: story.videoUrl,
+}));
 
 const ExploreScreen = () => {
   const router = useRouter();
