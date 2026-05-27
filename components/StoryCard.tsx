@@ -1,15 +1,18 @@
 import { Image } from "expo-image";
-import React from "react";
+import { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
 import type { Story } from "@/constants/story";
-import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/context/ThemeContext";
+import { downloadVideo } from "@/utils/async-storage";
 import { openStoryVideo } from "@/utils/videoNavigation";
+import { Ionicons } from "@expo/vector-icons";
 
 const CATEGORY_STYLES: Record<
   string,
@@ -43,6 +46,7 @@ const CATEGORY_STYLES: Record<
 
 const StoryCard = ({ item }: { item: Story }) => {
   const { colors } = useTheme();
+  const [loading, setLoading] = useState(false);
   const categoryStyle = CATEGORY_STYLES[item.categoryId] || {
     avatarBg: "bg-slate-100",
     iconColor: "#475569",
@@ -56,6 +60,59 @@ const StoryCard = ({ item }: { item: Story }) => {
 
     openStoryVideo(item);
   };
+
+  const handleDownload = async () => {
+    if (loading) return
+
+    if (!item.videoUrl) {
+      Alert.alert(
+        "Download Failed",
+        "No video is available to download."
+      )
+
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const result = await downloadVideo(
+        item.id,
+        item.videoUrl,
+        item.title
+      )
+
+      if (result?.success) {
+        if (result?.alreadyExists) {
+          Alert.alert(
+            "Already Downloaded",
+            "This video already exists."
+          )
+
+          return
+        }
+
+        Alert.alert(
+          "Download Complete",
+          `${item.title} saved offline.`
+        )
+      } else {
+        Alert.alert(
+          "Download Failed",
+          "Unable to download video."
+        )
+      }
+    } catch (error) {
+      console.log(error)
+
+      Alert.alert(
+        "Error",
+        "Something went wrong."
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <TouchableOpacity
@@ -187,13 +244,49 @@ const StoryCard = ({ item }: { item: Story }) => {
           </Text>
         </View>
 
-        <TouchableOpacity className="pl-2 pt-1" onPress={handlePress}>
-          <Ionicons
-            name="play-circle-outline"
-            size={18}
-            color={colors.secondaryText}
-          />
-        </TouchableOpacity>
+        <View className="flex-row items-center">
+          {/* Play */}
+          <TouchableOpacity
+            onPress={handlePress}
+            activeOpacity={0.8}
+            className="mr-2 h-11 w-11 items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor: `${colors.primary}15`,
+            }}
+          >
+            <Ionicons
+              name="play"
+              size={22}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+
+          {/* Download */}
+          <TouchableOpacity
+            onPress={handleDownload}
+            disabled={loading}
+            activeOpacity={0.8}
+            className="h-11 w-11 items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor:
+                colors.background,
+            }}
+          >
+            {
+              loading ? <ActivityIndicator size={21} color={
+                colors.secondary
+              } /> : <Ionicons
+                name="download-outline"
+                size={21}
+                color={
+                  colors.secondaryText
+                }
+              />
+            }
+          </TouchableOpacity>
+        </View>
+
+
       </View>
     </TouchableOpacity>
   );

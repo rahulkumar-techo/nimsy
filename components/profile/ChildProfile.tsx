@@ -3,7 +3,7 @@
  * Displays child avatar, achievements, and profile menu items
  */
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   Image,
@@ -18,9 +18,9 @@ import { useTheme } from "@/context/ThemeContext";
 
 import AchievementBadge from "@/components/profile/AchievementBadge";
 import MenuItem from "@/components/profile/MenuItem";
-import ProfileModal from "@/components/ProfileModel";
 import { Href } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import UserModal from "../details/UserModal";
 
 const CHILD_NAME = "Aarav";
 const CHILD_AGE = "6 years";
@@ -44,7 +44,32 @@ const MENU_ITEMS = [
 
 const ChildProfile = () => {
   const { colors } = useTheme();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+
+  const [avatarUrl, setAvatarUrl] =
+    useState(user?.photo ?? "")
+
+  useEffect(() => {
+    setAvatarUrl(user?.photo ?? "")
+  }, [user])
+
+  const resolvedAvatar =
+    avatarUrl.trim() || CHILD_AVATAR
+
+  const handleSelectAvatar = async (
+    selectedAvatar: string
+  ) => {
+    setAvatarUrl(selectedAvatar)
+
+    if (!user) return
+
+    await setUser({
+      ...user,
+      photo:
+        selectedAvatar.trim() || undefined,
+    })
+  }
+
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
@@ -55,13 +80,14 @@ const ChildProfile = () => {
         {/* Avatar */}
         <View className="relative">
           <Image
-            source={{ uri: user?.photo || CHILD_AVATAR }}
+            source={{ uri: resolvedAvatar }}
             className="h-28 w-28 rounded-full border-4"
             style={{ borderColor: colors.primary }}
           />
 
-          <ProfileModal className="absolute -bottom-1 -right-1"
-          image={user?.photo}
+          <UserModal
+            avatar={resolvedAvatar}
+            onSelectAvatar={handleSelectAvatar}
           />
         </View>
 

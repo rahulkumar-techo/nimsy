@@ -7,14 +7,61 @@ import {
 
 const DOWNLOAD_KEY = 'downloads';
 
+type DownloadItem = {
+  id: string;
+  title: string;
+  localPath: string;
+  downloadedAt: string;
+  sizeMB?: number;
+  duration?: number;
+};
+
+type DownloadResult =
+  | {
+      success: true;
+      item: DownloadItem;
+      alreadyExists?: false;
+    }
+  | {
+      success: true;
+      item: DownloadItem;
+      alreadyExists: true;
+    }
+  | {
+      success: false;
+      error?: unknown;
+    };
+
 /* ---------------- DOWNLOAD VIDEO ---------------- */
 
 export const downloadVideo = async (
   id: string,
   videoUrl: string,
   title: string
-) => {
+): Promise<DownloadResult> => {
   try {
+    // get old downloads
+    const existing = await AsyncStorage.getItem(
+      DOWNLOAD_KEY
+    );
+
+    const downloads: DownloadItem[] = existing
+      ? JSON.parse(existing)
+      : [];
+
+    // prevent duplicate
+    const alreadyExists = downloads.find(
+      (item) => item.id === id
+    );
+
+    if (alreadyExists) {
+      return {
+        success: true,
+        alreadyExists: true,
+        item: alreadyExists,
+      };
+    }
+
     // create folder
     const downloadsDir = new Directory(
       Paths.document,
@@ -37,25 +84,7 @@ export const downloadVideo = async (
       file
     );
 
-    // get old downloads
-    const existing = await AsyncStorage.getItem(
-      DOWNLOAD_KEY
-    );
-
-    const downloads = existing
-      ? JSON.parse(existing)
-      : [];
-
-    // prevent duplicate
-    const alreadyExists = downloads.find(
-      (item: any) => item.id === id
-    );
-
-    if (alreadyExists) {
-      return alreadyExists;
-    }
-
-    const newItem = {
+    const newItem: DownloadItem = {
       id,
       title,
       localPath: downloadedFile.uri,
@@ -70,10 +99,16 @@ export const downloadVideo = async (
       JSON.stringify(downloads)
     );
 
-    return newItem;
+    return {
+      success: true,
+      item: newItem,
+    };
   } catch (error) {
     console.log('Download Error:', error);
-    return null;
+    return {
+      success: false,
+      error,
+    };
   }
 };
 
