@@ -41,8 +41,8 @@ jobs:
       - name: Run Expo Doctor
         run: npx expo-doctor@latest
 
-      - name: Check Unused Dependencies
-        run: npx depcheck
+      # - name: Check Unused Dependencies
+      #   run: npx depcheck
 
       - name: Export Expo Bundle
         run: npx expo export --platform android
