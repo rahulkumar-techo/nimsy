@@ -3,6 +3,8 @@
     "name": "nimsy",
     "slug": "nimsy",
     "version": "1.0.0",
+    // Enable Hermes /Enable Hermes/faster startup/less memory
+    "jsEngine": "hermes",
     "orientation": "default",
     "icon": "./assets/branding/nimsy-logo.png",
     "scheme": "com.rahul.nimsyclient",
@@ -15,6 +17,8 @@
       "package": "com.rahul.nimsyclient",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      // Android native shrinking.(Enable Proguard/R8)
+      "enableProguardInReleaseBuilds": true,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
