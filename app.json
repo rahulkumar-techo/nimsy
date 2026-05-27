@@ -17,8 +17,6 @@
       "package": "com.rahul.nimsyclient",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      // Android native shrinking.(Enable Proguard/R8)
-      "enableProguardInReleaseBuilds": true,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
