@@ -49,7 +49,8 @@ const Collection = () => {
         horizontal
       />
 
-      <FlatList
+    <View className="px-5">
+        <FlatList
         horizontal
         data={collections}
         keyExtractor={(item) => item.id}
@@ -58,11 +59,10 @@ const Collection = () => {
         initialNumToRender={2}
         maxToRenderPerBatch={2}
         windowSize={5}
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-        }}
+       
         renderItem={renderCollection}
       />
+    </View>
     </View>
   );
 };

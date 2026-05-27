@@ -2,6 +2,8 @@
  * Profile Menu Item
  */
 
+import React from "react";
+
 import {
   Text,
   TouchableOpacity,
@@ -11,44 +13,103 @@ import {
 import {
   Ionicons,
 } from "@expo/vector-icons";
+
 import {
   Href,
   useRouter,
 } from "expo-router";
 
+import { useTheme } from "@/context/ThemeContext";
+
 type Props = {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
   link?: Href;
+  subtitle?: string;
 };
 
 const MenuItem = ({
   title,
   icon,
   link,
+  subtitle = "Manage settings",
 }: Props) => {
   const router = useRouter();
 
-  const handleRedirect = () => {
-    if (!link) return;
+  const { colors } =
+    useTheme();
 
-    router.push(link);
-  };
+  /**
+   * Redirect
+   */
+  const handleRedirect =
+    () => {
+      if (!link) return;
+
+      router.push(link);
+    };
 
   return (
     <TouchableOpacity
-      className="bg-white rounded-2xl p-5 flex-row items-center justify-between border border-gray-100 mb-3"
+      activeOpacity={0.85}
       onPress={handleRedirect}
+      className="mb-4 flex-row items-center justify-between rounded-[28px] p-5"
+      style={{
+        backgroundColor:
+          colors.card,
+      }}
     >
+      {/* Left */}
       <View className="flex-row items-center">
-        <Ionicons name={icon} size={22} color="#5B5FFF" />
+        {/* Icon */}
+        <View
+          className="mr-4 h-16 w-16 items-center justify-center rounded-3xl"
+          style={{
+            backgroundColor:
+              colors.primaryLight,
+          }}
+        >
+          <Ionicons
+            name={icon}
+            size={28}
+            color={
+              colors.primary
+            }
+          />
+        </View>
 
-        <Text className="ml-4 font-medium text-base">
-          {title}
-        </Text>
+        {/* Content */}
+        <View>
+          <Text
+            className="text-xl font-bold"
+            style={{
+              color:
+                colors.text,
+            }}
+          >
+            {title}
+          </Text>
+
+          <Text
+            className="mt-1"
+            style={{
+              color:
+                colors.secondaryText,
+            }}
+          >
+            {subtitle}
+          </Text>
+        </View>
       </View>
 
-      <Ionicons name="chevron-forward" size={20} color="#999" />
+      {/* Arrow */}
+      <Ionicons
+        name="chevron-forward"
+        size={24}
+        color={
+          colors.secondaryText
+        }
+      />
     </TouchableOpacity>
   );
 };

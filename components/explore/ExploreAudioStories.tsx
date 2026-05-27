@@ -176,7 +176,8 @@ const ExploreAudioStories =
         </View>
 
         {/* List */}
-        <FlatList
+       <View className="px-5">
+         <FlatList
           horizontal
           data={DUMMY_AUDIO_STORIES.slice(
             0,
@@ -190,13 +191,15 @@ const ExploreAudioStories =
             false
           }
           contentContainerStyle={{
-            paddingHorizontal: 20,
+            // gap: 16,
+            paddingRight: 20,
           }}
           removeClippedSubviews
           initialNumToRender={3}
           maxToRenderPerBatch={5}
           windowSize={5}
         />
+       </View>
       </View>
     );
   };
