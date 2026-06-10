@@ -1,16 +1,22 @@
 import { Redirect } from "expo-router"
 import { ActivityIndicator, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
-import UserAuth from "@/components/UserAuth"
 import { useAuth } from "@/context/AuthContext"
 import { useTheme } from "@/context/ThemeContext"
+import Login from "./(auth)/login"
 
 export default function Index() {
   const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth()
   const { colors } = useTheme()
 
+  console.log({
+  user,
+  hasCompletedOnboarding,
+  isOnboardingReady,
+});
+
   if (user) {
-    if (!isOnboardingReady) {
+    if (!hasCompletedOnboarding) {
       return (
         <SafeAreaView
           className="flex-1"
@@ -33,7 +39,7 @@ export default function Index() {
       className="flex-1"
       style={{ backgroundColor: colors.background }}
     >
-      <UserAuth />
+      <Login />
     </SafeAreaView>
   )
 }

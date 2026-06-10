@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { ImageBackground, Pressable, Text, View } from "react-native"
 import { useAuth } from "@/context/AuthContext"
+import { useAuthActions } from "@/hooks/useAuthActions"
 
 const ONBOARDING_DATA = [
   {
@@ -54,12 +55,15 @@ const ONBOARDING_DATA = [
 ]
 
 export default function Onboarding() {
-  const router = useRouter()
-  const { completeOnboarding } = useAuth()
+  const router = useRouter();
   const [step, setStep] = useState(0)
   const isLastStep = step === ONBOARDING_DATA.length - 1
 
   const current = ONBOARDING_DATA[step]
+
+  const { onboardingComplete, loading } = useAuthActions();
+  const { refreshUser } = useAuth();
+
 
   const next = async () => {
     if (!isLastStep) {
@@ -67,7 +71,11 @@ export default function Onboarding() {
       return
     }
 
-    await completeOnboarding()
+    const { setUser } = useAuth();
+
+    const response = await onboardingComplete();
+
+    setUser(response.data);
     router.replace("/(tabs)/home")
   }
 
@@ -120,9 +128,8 @@ export default function Onboarding() {
           {ONBOARDING_DATA.map((_, i) => (
             <View
               key={i}
-              className={`h-2 w-2 rounded-full ${
-                i === step ? "bg-white w-6" : "bg-white/40"
-              }`}
+              className={`h-2 w-2 rounded-full ${i === step ? "bg-white w-6" : "bg-white/40"
+                }`}
             />
           ))}
         </View>
@@ -132,9 +139,13 @@ export default function Onboarding() {
           onPress={next}
           className="mb-8 rounded-xl items-center bg-white py-4"
         >
-          <Text className="font-semibold text-slate-900">
-            {current.button}
-          </Text>
+          {
+            loading ? <Text className="font-semibold text-slate-900">
+              {"Finishing..."}
+            </Text> : <Text className="font-semibold text-slate-900">
+              {current.button}
+            </Text>
+          }
         </Pressable>
       </View>
     </ImageBackground>

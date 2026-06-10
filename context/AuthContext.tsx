@@ -1,190 +1,155 @@
 /**
- * Auth Context (Global State)
- * Handles user session across app
+ * Auth Context
+ * Manages authenticated user state
  */
 
-import AsyncStorage from "@react-native-async-storage/async-storage"
-import { GoogleSignin } from "@react-native-google-signin/google-signin"
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import {
   createContext,
   useContext,
   useEffect,
   useState,
   ReactNode,
-} from "react"
+} from "react";
 
-type User = {
-  id: string
-  name: string
-  email: string
-  photo?: string
-}
+import { authStorage, User } from "@/utils/auth-storage";
+import { useAuthActions } from "@/hooks/useAuthActions";
+
+export type { User };
 
 type AuthContextType = {
-  user: User | null
-  setUser: (user: User | null) => Promise<void>
-  hasCompletedOnboarding: boolean
-  isOnboardingReady: boolean
-  completeOnboarding: () => Promise<void>
-  logout: () => Promise<void>
-}
+  user: User | null;
+  hasCompletedOnboarding: boolean;
+   setHasCompletedOnboarding: (value: boolean) => void;
+  isOnboardingReady: boolean;
+  setUser: (user: User | null) => void;
+  refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
+};
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const USER_STORAGE_KEY = "auth_user"
+export const AuthProvider = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
+  const [user, setUserState] = useState<User | null>(null);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isOnboardingReady, setIsOnboardingReady] = useState(false);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUserState] = useState<User | null>(null)
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] =
-    useState(false)
-  const [isOnboardingReady, setIsOnboardingReady] = useState(false)
+  const { me } = useAuthActions();
 
   /**
-   * Load saved user on app start
+   * Fetch current user from backend
+   */
+  const refreshUser = async () => {
+    try {
+      const response = await me();
+
+      //       console.log(
+      //   JSON.stringify(response, null, 2)
+      // );
+
+      if (!response.data) {
+        setUserState(null);
+        setHasCompletedOnboarding(false);
+        return;
+      }
+
+      setUserState(response.data);
+      setHasCompletedOnboarding(
+        response.data.onboardingCompleted
+      );
+    } catch (error) {
+      console.log("Failed to fetch user", error);
+
+      setUserState(null);
+      setHasCompletedOnboarding(false);
+    }
+  };
+
+  /**
+   * Restore authentication state on app launch
    */
   useEffect(() => {
-    const loadUser = async () => {
+    const initializeAuth = async () => {
       try {
-        const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY)
+        const accessToken =
+          await authStorage.getAccessToken();
 
-        if (storedUser) {
-          const parsedUser: User = JSON.parse(storedUser)
-          setUserState(parsedUser)
+        if (accessToken) {
+          await refreshUser();
         }
       } catch (error) {
-        console.log("Failed to load user", error)
+        console.log(
+          "Failed to initialize auth",
+          error
+        );
       } finally {
-        setIsOnboardingReady(true)
+        setIsOnboardingReady(true);
       }
-    }
+    };
 
-    loadUser()
-  }, [])
+    initializeAuth();
+  }, []);
 
   /**
-   * Save/remove user from storage
+   * Update user in memory
    */
-  const setUser = async (nextUser: User | null) => {
-    try {
-      if (nextUser) {
-        await AsyncStorage.setItem(
-          USER_STORAGE_KEY,
-          JSON.stringify(nextUser)
-        )
-      } else {
-        await AsyncStorage.removeItem(USER_STORAGE_KEY)
-      }
-
-      setUserState(nextUser)
-
-      if (!nextUser) {
-        setHasCompletedOnboarding(false)
-      }
-    } catch (error) {
-      console.log("Failed to save user", error)
-    }
-  }
+  const setUser = (user: User | null) => {
+    setUserState(user);
+  };
 
   /**
-   * Sync onboarding state
-   */
-  useEffect(() => {
-    let isMounted = true
-
-    const syncOnboardingState = async () => {
-      if (!user?.id) {
-        if (!isMounted) return
-
-        setHasCompletedOnboarding(false)
-        return
-      }
-
-      try {
-        const storedValue = await AsyncStorage.getItem(
-          `onboarding:${user.id}`
-        )
-
-        if (isMounted) {
-          setHasCompletedOnboarding(storedValue === "true")
-        }
-      } catch (error) {
-        console.log("Failed to load onboarding state", error)
-
-        if (isMounted) {
-          setHasCompletedOnboarding(false)
-        }
-      }
-    }
-
-    syncOnboardingState()
-
-    return () => {
-      isMounted = false
-    }
-  }, [user?.id])
-
-  /**
-   * Complete onboarding
-   */
-  const completeOnboarding = async () => {
-    if (!user?.id) return
-
-    setHasCompletedOnboarding(true)
-
-    try {
-      await AsyncStorage.setItem(
-        `onboarding:${user.id}`,
-        "true"
-      )
-    } catch (error) {
-      console.log("Failed to save onboarding state", error)
-    }
-  }
-
-  /**
-   * Logout
+   * Clear session and sign out
    */
   const logout = async () => {
     try {
-      const isSignedIn = await GoogleSignin.hasPreviousSignIn()
+      const isSignedIn =
+        await GoogleSignin.hasPreviousSignIn();
 
       if (isSignedIn) {
-        await GoogleSignin.signOut()
+        await GoogleSignin.signOut();
       }
     } catch (error) {
-      console.log("Logout failed", error)
+      console.log("Google sign out failed", error);
     } finally {
-      await AsyncStorage.removeItem(USER_STORAGE_KEY)
-      setUserState(null)
-      setHasCompletedOnboarding(false)
+      await authStorage.clear();
+
+      setUserState(null);
+      setHasCompletedOnboarding(false);
     }
-  }
+  };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        setUser,
         hasCompletedOnboarding,
         isOnboardingReady,
-        completeOnboarding,
+        setHasCompletedOnboarding,
+        setUser,
+        refreshUser,
         logout,
       }}
     >
       {children}
     </AuthContext.Provider>
-  )
-}
+  );
+};
 
 /**
- * Custom hook
+ * Access auth context
  */
 export const useAuth = () => {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider")
+    throw new Error(
+      "useAuth must be used inside AuthProvider"
+    );
   }
 
-  return context
-}
+  return context;
+};

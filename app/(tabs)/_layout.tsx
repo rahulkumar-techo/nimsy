@@ -8,7 +8,9 @@ import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useTheme } from "@/context/ThemeContext";
-import UserAuth from "@/components/UserAuth";
+import Login from "../(auth)/login";
+import OnboardingRoute from "../onboarding";
+
 
 export default function TabsLayout() {
   const { user, hasCompletedOnboarding, isOnboardingReady } = useAuth();
@@ -21,7 +23,7 @@ export default function TabsLayout() {
   }
 
   if (!isOnboardingReady) {
-    return <UserAuth/>;
+    return <OnboardingRoute/>;
   }
 
   if (!hasCompletedOnboarding) {
