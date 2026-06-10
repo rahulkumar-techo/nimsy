@@ -65,19 +65,18 @@ export default function Onboarding() {
   const { refreshUser } = useAuth();
 
 
-  const next = async () => {
+ const next = async () => {
     if (!isLastStep) {
-      setStep((currentStep) => currentStep + 1)
-      return
+      setStep((s) => s + 1);
+      return;
     }
 
-    const { setUser } = useAuth();
+    await onboardingComplete();
+    await refreshUser();
+    
 
-    const response = await onboardingComplete();
-
-    setUser(response.data);
-    router.replace("/(tabs)/home")
-  }
+    router.replace("/(tabs)/home");
+  };
 
   const prev = () => {
     if (step > 0) {

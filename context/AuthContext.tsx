@@ -10,6 +10,7 @@ import {
   useEffect,
   useState,
   ReactNode,
+  useCallback,
 } from "react";
 
 import { authStorage, User } from "@/utils/auth-storage";
@@ -43,56 +44,52 @@ export const AuthProvider = ({
   /**
    * Fetch current user from backend
    */
-  const refreshUser = async () => {
-    try {
-      const response = await me();
+const refreshUser = useCallback(async () => {
+  try {
+    const response = await me();
 
-      //       console.log(
-      //   JSON.stringify(response, null, 2)
-      // );
-
-      if (!response.data) {
-        setUserState(null);
-        setHasCompletedOnboarding(false);
-        return;
-      }
-
-      setUserState(response.data);
-      setHasCompletedOnboarding(
-        response.data.onboardingCompleted
-      );
-    } catch (error) {
-      console.log("Failed to fetch user", error);
-
+    if (!response?.data) {
       setUserState(null);
       setHasCompletedOnboarding(false);
+      return;
     }
-  };
+
+    setUserState(response.data);
+    setHasCompletedOnboarding(
+      response.data.onboardingCompleted
+    );
+  } catch (error) {
+    console.log("Failed to fetch user", error);
+
+    setUserState(null);
+    setHasCompletedOnboarding(false);
+  }
+}, [me]);
 
   /**
    * Restore authentication state on app launch
    */
-  useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const accessToken =
-          await authStorage.getAccessToken();
+useEffect(() => {
+  const initializeAuth = async () => {
+    try {
+      const accessToken =
+        await authStorage.getAccessToken();
 
-        if (accessToken) {
-          await refreshUser();
-        }
-      } catch (error) {
-        console.log(
-          "Failed to initialize auth",
-          error
-        );
-      } finally {
-        setIsOnboardingReady(true);
+      if (accessToken) {
+        await refreshUser();
       }
-    };
+    } catch (error) {
+      console.log(
+        "Failed to initialize auth",
+        error
+      );
+    } finally {
+      setIsOnboardingReady(true);
+    }
+  };
 
-    initializeAuth();
-  }, []);
+  initializeAuth();
+}, [refreshUser]);
 
   /**
    * Update user in memory

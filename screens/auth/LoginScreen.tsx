@@ -1,8 +1,6 @@
 /**
  * Login Screen
  */
-
-import React from "react";
 import {
   Alert,
   ScrollView,

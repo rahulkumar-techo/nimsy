@@ -15,8 +15,7 @@ import {
 import { useAuth } from "@/context/AuthContext"
 import { useTheme } from "@/context/ThemeContext"
 
-import UserModal from "./UserModal"
-import { useAuthActions } from "@/hooks/useAuthActions"
+import UserModal from "./UserModal";
 
 export default function UserProfileDetails() {
 
@@ -32,23 +31,7 @@ export default function UserProfileDetails() {
     useState(user?.photo ?? "")
   // const { me } = useAuthActions();
 
-  // // Load fresh profile from server on mount
-  // useEffect(() => {
-  //   const loadProfile = async () => {
-  //     try {
-  //       setLoadingProfile(true)
-  //       const profile = await me()         // fetch from server
-  //       await setUser(profile)             // sync into context + storage
-  //       // local state will update via the useEffect below
-  //     } catch {
-  //       // silently fall back to cached user in context
-  //     } finally {
-  //       setLoadingProfile(false)
-  //     }
-  //   }
 
-  //   loadProfile()
-  // }, [])
 
   useEffect(() => {
     setName(user?.name ?? "")

@@ -8,7 +8,6 @@ import { Redirect, Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useTheme } from "@/context/ThemeContext";
-import Login from "../(auth)/login";
 import OnboardingRoute from "../onboarding";
 
 

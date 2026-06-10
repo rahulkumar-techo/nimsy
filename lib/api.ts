@@ -10,12 +10,13 @@
 import axios, {
   AxiosInstance,
   InternalAxiosRequestConfig,
+  create
 } from "axios";
 import { authStorage } from "@/utils/auth-storage";
 
 const API_BASE_URL = "http://10.189.245.170:5000/api/v1";
 
-const axiosInstance: AxiosInstance = axios.create({
+const axiosInstance: AxiosInstance = create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
@@ -37,10 +38,10 @@ axiosInstance.interceptors.request.use(
 // ─── Token refresh ────────────────────────────────────────────────────────────
 
 let isRefreshing = false;
-let failedQueue: Array<{
+let failedQueue: {
   resolve: (token: string) => void;
   reject: (err: unknown) => void;
-}> = [];
+}[] = [];
 
 function processQueue(error: unknown, token: string | null) {
   failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token!)));

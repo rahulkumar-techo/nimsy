@@ -7,7 +7,6 @@ import React from "react";
 import {
   FlatList,
   Image,
-  ScrollView,
   Text,
   TouchableOpacity,
   View,

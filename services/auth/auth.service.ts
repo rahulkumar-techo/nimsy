@@ -111,4 +111,3 @@ async login(payload: LoginPayload) {
 }
 
 export const authService = new AuthService();
-export default authService;

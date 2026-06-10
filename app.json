@@ -3,7 +3,6 @@
     "name": "nimsy",
     "slug": "nimsy",
     "version": "1.0.0",
-    // Enable Hermes /Enable Hermes/faster startup/less memory
     "jsEngine": "hermes",
     "orientation": "default",
     "icon": "./assets/branding/nimsy-logo.png",
@@ -65,7 +64,8 @@
       ],
       "expo-web-browser",
       "expo-asset",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

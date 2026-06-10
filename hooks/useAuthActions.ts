@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 
-import authService from "@/services/auth/auth.service";
+import {authService} from "@/services/auth/auth.service";
 
 import {
     LoginPayload,
@@ -14,7 +14,7 @@ import {
     ResetPasswordPayload,
 } from "@/types/auth.types";
 
-export function useAuthActions() {
+ export function useAuthActions() {
     const [loading, setLoading] = useState(false);
 
     const [error, setError] = useState<string | null>(
