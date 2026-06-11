@@ -89,7 +89,7 @@ useEffect(() => {
   };
 
   initializeAuth();
-}, [refreshUser]);
+});
 
   /**
    * Update user in memory

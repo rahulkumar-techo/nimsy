@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { useTheme } from "@/context/ThemeContext";
 import OnboardingRoute from "../onboarding";
+import { View } from "react-native";
 
 
 export default function TabsLayout() {
@@ -22,7 +23,7 @@ export default function TabsLayout() {
   }
 
   if (!isOnboardingReady) {
-    return <OnboardingRoute/>;
+    return <OnboardingRoute />;
   }
 
   if (!hasCompletedOnboarding) {
@@ -85,6 +86,37 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="create"
+        options={{
+          title: "",
+
+          tabBarLabel: () => null,
+
+          tabBarIcon: () => (
+            <View
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: 25,
+                backgroundColor: colors.primary,
+                justifyContent: "center",
+                alignItems: "center",
+                marginTop: -10,
+              }}
+            >
+              <Ionicons
+                name="add"
+                size={28}
+                color="#fff"
+              />
+            </View>
+          ),
+        }}
+      />
+
+
+
 
       <Tabs.Screen
         name="library"
@@ -105,7 +137,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: "Profile",
-          
+
 
           tabBarIcon: ({ color, size, focused }) =>
             user?.photo ? (
