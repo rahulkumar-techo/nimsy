@@ -1,17 +1,103 @@
-/**
- * Create Content Screen
- */
-
+import React from "react";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import {
-  TouchableOpacity,
   Text,
   View,
+  Pressable,
 } from "react-native";
+import Animated, {
+  FadeIn
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+
+import { useTheme } from "@/context/ThemeContext";
+import AnimatedBackground from "@/components/AnimatedBackground";
+
+function AnimatedCard({
+  item,
+}: any) {
+  const { colors } = useTheme();
+
+  return (
+    <Pressable
+      onPress={() => router.push(item.route)}
+    >
+      <View
+        style={{
+          backgroundColor: colors.card,
+          borderRadius: 24,
+          padding: 20,
+          marginBottom: 16,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 100,
+              backgroundColor: colors.primary,
+              opacity: 0.15,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Ionicons
+              name={item.icon}
+              size={28}
+              color={colors.primary}
+            />
+          </View>
+
+          <View
+            style={{
+              flex: 1,
+              marginLeft: 16,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 18,
+                fontWeight: "700",
+              }}
+            >
+              {item.title}
+            </Text>
+
+            <Text
+              style={{
+                color: colors.text,
+                opacity: 0.7,
+                marginTop: 4,
+              }}
+            >
+              Start creating now
+            </Text>
+          </View>
+
+          <Ionicons
+            name="arrow-forward"
+            size={22}
+            color={colors.primary}
+          />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
 
 export default function CreateContentScreen() {
+  const { colors } = useTheme();
+
   const actions = [
     {
       title: "Upload Video",
@@ -31,36 +117,56 @@ export default function CreateContentScreen() {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-white px-5">
-      <Text className="text-2xl font-bold mt-6 mb-8">
-        Create Content
-      </Text>
-
-      <View className="gap-4">
-        {actions.map((action) => (
-          <TouchableOpacity
-            key={action.title}
-            onPress={() =>
-              router.push(
-                action.route as any
-              )
-            }
-            className="flex-row items-center bg-gray-100 p-5 rounded-2xl"
-          >
-            <View className="w-14 h-14 rounded-full bg-black items-center justify-center">
-              <Ionicons
-                name={action.icon as any}
-                size={24}
-                color="#fff"
-              />
-            </View>
-
-            <Text className="ml-4 text-lg font-semibold">
-              {action.title}
+    <AnimatedBackground
+      primaryColor={colors.primary}
+      backgroundColor={colors.background}
+    >
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: "transparent",
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            paddingHorizontal: 20,
+          }}
+        >
+          <Animated.View entering={FadeIn}>
+            <Text
+              style={{
+                fontSize: 30,
+                fontWeight: "800",
+                color: colors.text,
+                marginTop: 20,
+              }}
+            >
+              Create Content
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </SafeAreaView>
+
+            <Text
+              style={{
+                color: colors.text,
+                opacity: 0.7,
+                marginTop: 8,
+                marginBottom: 30,
+              }}
+            >
+              Choose what you want to publish today.
+            </Text>
+          </Animated.View>
+
+          {actions.map((item, index) => (
+            <AnimatedCard
+              key={item.title}
+              item={item}
+              index={index}
+              colors={colors}
+            />
+          ))}
+        </View>
+      </SafeAreaView>
+    </AnimatedBackground>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   Text,
   TouchableOpacity,
@@ -6,16 +6,15 @@ import {
   Platform,
   StyleSheet,
   Animated,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/context/ThemeContext";
-import { useVideoUpload } from "@/hooks/useVideoUpload";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { UploadTab } from "@/types/upload.types";
 
 import UploadHeader from "@/components/create/upload-video/UploadHeader";
-import UploadProgress from "@/components/create/upload-video/UploadProgress";
 import { useUploadForm } from "@/components/create/upload-video/hook/useUploadForm";
 import { DetailsTab } from "@/components/create/upload-video/components/tabs/DetailsTab";
 import { ChaptersTab } from "@/components/create/upload-video/components/tabs/ChaptersTab";
@@ -23,35 +22,54 @@ import { VisibilityTab } from "@/components/create/upload-video/components/tabs/
 import { MoreTab } from "@/components/create/upload-video/components/tabs/MoreTab";
 import UploadTabs from "@/components/create/upload-video/UploadTabs";
 
-
-export default function UploadVideoScreen() {
+export default function EditVideoScreen() {
   const { colors } = useTheme();
-  const { video, pickVideo } = useVideoUpload();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const videoId = params.id as string;
+  
   const [activeTab, setActiveTab] = useState<UploadTab>("details");
-  const [thumbnail, setThumbnail] = useState<string | null>(null);
 
   const {
     form,
     visibility, setVisibility,
     chapters, addChapter, updateChapter, removeChapter,
-    uploadProgress,
-    onSubmit,
-  } = useUploadForm(video);
+  } = useUploadForm(null);
 
   const { control, handleSubmit, formState: { errors, isSubmitting } } = form;
 
-  // ── Animated video collapse on scroll ───────────────────────────────────────
-
   const scrollY = useRef(new Animated.Value(0)).current;
-
 
   const inputStyle = [
     styles.input,
     { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
   ];
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (videoId) {
+      console.log("Fetching video:", videoId);
+    }
+  }, [videoId]);
+
+  const handleSave = async (data: any) => {
+    if (!videoId) {
+      Alert.alert("Error", "No video ID provided");
+      return;
+    }
+    try {
+      console.log("Saving video changes:", {
+        videoId,
+        formData: data,
+        visibility,
+        chapters,
+      });
+      Alert.alert("Success", "Video updated successfully!", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error: any) {
+      Alert.alert("Update Failed", error?.message ?? "Something went wrong.");
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -73,20 +91,9 @@ export default function UploadVideoScreen() {
           )}
           scrollEventThrottle={16}
         >
-          {/* ── Video pill / picker ── */}
-          {!video ? (
-            <TouchableOpacity
-              onPress={pickVideo}
-              style={[styles.topPicker, { backgroundColor: colors.accentSurface, borderColor: colors.accentBorder }]}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="videocam-outline" size={20} color={colors.accent} />
-              <Text style={[styles.topPickerText, { color: colors.accent }]}>
-                Select a video from your device
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.mutedText} />
-            </TouchableOpacity>
-          ) : null}
+          <Text style={[styles.videoLabel, { color: colors.mutedText }]}>
+            Video ID: {videoId}
+          </Text>
 
           <UploadTabs activeTab={activeTab} onChange={setActiveTab} />
 
@@ -95,11 +102,12 @@ export default function UploadVideoScreen() {
               control={control}
               errors={errors}
               inputStyle={inputStyle}
-              thumbnail={thumbnail}
-              onThumbnailChange={setThumbnail}
-              video={video}
-              onReplaceVideo={pickVideo}
+              thumbnail={null}
+              onThumbnailChange={() => {}}
+              video={null}
+              onReplaceVideo={() => {}}
               colors={colors}
+              showVideoPreview={false}
             />
           )}
           {activeTab === "chapters" && (
@@ -123,42 +131,29 @@ export default function UploadVideoScreen() {
           )}
 
           <TouchableOpacity
-            onPress={handleSubmit(onSubmit)}
+            onPress={handleSubmit(handleSave)}
             disabled={isSubmitting}
-            style={[styles.uploadBtn, { backgroundColor: colors.accent }]}
+            style={[styles.saveBtn, { backgroundColor: colors.accent }]}
             activeOpacity={0.85}
           >
-            <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
-            <Text style={styles.uploadBtnText}>
-              {isSubmitting ? "Preparing…" : "Upload Video"}
+            <Ionicons name="save-outline" size={20} color="#fff" />
+            <Text style={styles.saveBtnText}>
+              {isSubmitting ? "Saving…" : "Save Changes"}
             </Text>
           </TouchableOpacity>
 
           <Text style={[styles.tos, { color: colors.mutedText }]}>
-            By uploading, you agree to the Terms of Service and Community Guidelines.
+            Changes to video settings will be applied immediately.
           </Text>
         </Animated.ScrollView>
       </KeyboardAvoidingView>
-
-      {uploadProgress !== null && <UploadProgress progress={uploadProgress} />}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  topPicker: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: "dashed",
-  },
-  topPickerText: { flex: 1, fontSize: 14, fontWeight: "500" },
+  videoLabel: { fontSize: 12, paddingHorizontal: 16, paddingTop: 12 },
   scroll: { paddingBottom: 48, gap: 12 },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -167,7 +162,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
   },
-  uploadBtn: {
+  saveBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -177,6 +172,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginHorizontal: 16,
   },
-  uploadBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   tos: { fontSize: 11, textAlign: "center", marginTop: 14, lineHeight: 17, paddingHorizontal: 16 },
 });

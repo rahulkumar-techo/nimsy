@@ -9,6 +9,7 @@ export type VideoAsset = DocumentPicker.DocumentPickerAsset;
 
 export function useVideoUpload() {
   const [video, setVideo] = useState<VideoAsset | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const pickVideo = useCallback(async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -17,10 +18,18 @@ export function useVideoUpload() {
     });
     if (!result.canceled) {
       setVideo(result.assets[0]);
+      setUploadProgress(null);
     }
   }, []);
 
-  const clearVideo = useCallback(() => setVideo(null), []);
+  const clearVideo = useCallback(() => {
+    setVideo(null);
+    setUploadProgress(null);
+  }, []);
 
-  return { video, pickVideo, clearVideo };
+  const updateProgress = useCallback((progress: number | null) => {
+    setUploadProgress(progress);
+  }, []);
+
+  return { video, uploadProgress, pickVideo, clearVideo, updateProgress };
 }

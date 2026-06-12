@@ -14,7 +14,8 @@ import {
 } from "react";
 
 import { authStorage, User } from "@/utils/auth-storage";
-import { useAuthActions } from "@/hooks/useAuthActions";
+// import { useAuthActions } from "@/hooks/useAuthActions";
+import { authService } from "@/services/auth/auth.service";
 
 export type { User };
 
@@ -39,32 +40,30 @@ export const AuthProvider = ({
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
 
-  const { me } = useAuthActions();
-
   /**
    * Fetch current user from backend
    */
-const refreshUser = useCallback(async () => {
-  try {
-    const response = await me();
+  const refreshUser = useCallback(async () => {
+    console.log("REFRESH USER CALLED");
+    try {
+      const response = await authService.getProfile();
 
-    if (!response?.data) {
+      if (!response?.data) {
+        setUserState(null);
+        setHasCompletedOnboarding(false);
+        return;
+      }
+
+      setUserState(response.data);
+      setHasCompletedOnboarding(
+        response.data.onboardingCompleted
+      );
+    } catch (error) {
+      console.log("Failed to fetch user", error);
       setUserState(null);
       setHasCompletedOnboarding(false);
-      return;
     }
-
-    setUserState(response.data);
-    setHasCompletedOnboarding(
-      response.data.onboardingCompleted
-    );
-  } catch (error) {
-    console.log("Failed to fetch user", error);
-
-    setUserState(null);
-    setHasCompletedOnboarding(false);
-  }
-}, [me]);
+  }, []);
 
   /**
    * Restore authentication state on app launch
@@ -89,7 +88,7 @@ useEffect(() => {
   };
 
   initializeAuth();
-});
+}, [refreshUser]);
 
   /**
    * Update user in memory

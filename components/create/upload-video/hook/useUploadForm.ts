@@ -21,7 +21,6 @@ export function useUploadForm(video: any) {
   const [chapters,       setChapters]       = useState<Chapter[]>([
     { id: "1", time: "0:00", title: "Intro" },
   ]);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -34,8 +33,6 @@ export function useUploadForm(video: any) {
       allowRatings:  true,
     },
   });
-
-  // ── Chapter helpers ────────────────────────────────────────────────────────
 
   const addChapter = () =>
     setChapters((prev) => [
@@ -51,29 +48,12 @@ export function useUploadForm(video: any) {
   const removeChapter = (id: string) =>
     setChapters((prev) => prev.filter((c) => c.id !== id));
 
-  // ── Upload simulation ──────────────────────────────────────────────────────
-
-  const simulateUpload = () => {
-    setUploadProgress(0);
-    let p = 0;
-    const iv = setInterval(() => {
-      p += Math.random() * 9 + 1;
-      if (p >= 100) {
-        p = 100;
-        clearInterval(iv);
-        setTimeout(() => setUploadProgress(null), 2000);
-      }
-      setUploadProgress(Math.round(p));
-    }, 250);
-  };
-
   const onSubmit = async (data: FormData) => {
     if (!video) {
       Alert.alert("No Video", "Please select a video first.");
       return;
     }
     console.log({ ...data, video, chapters, visibility });
-    simulateUpload();
   };
 
   return {
@@ -81,7 +61,6 @@ export function useUploadForm(video: any) {
     visibility, setVisibility,
     chapters,
     addChapter, updateChapter, removeChapter,
-    uploadProgress,
     onSubmit,
   };
 }
