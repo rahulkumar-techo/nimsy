@@ -1,26 +1,26 @@
-import React, { useRef, useState, useEffect } from "react";
+import { useTheme } from "@/context/ThemeContext";
+import { UploadTab } from "@/types/upload.types";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
-  Text,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Animated,
-  Alert,
+    Alert,
+    Animated,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/context/ThemeContext";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { UploadTab } from "@/types/upload.types";
 
-import UploadHeader from "@/components/create/upload-video/UploadHeader";
-import { useUploadForm } from "@/components/create/upload-video/hook/useUploadForm";
-import { DetailsTab } from "@/components/create/upload-video/components/tabs/DetailsTab";
 import { ChaptersTab } from "@/components/create/upload-video/components/tabs/ChaptersTab";
-import { VisibilityTab } from "@/components/create/upload-video/components/tabs/VisibilityTab";
+import { DetailsTab } from "@/components/create/upload-video/components/tabs/DetailsTab";
 import { MoreTab } from "@/components/create/upload-video/components/tabs/MoreTab";
+import { VisibilityTab } from "@/components/create/upload-video/components/tabs/VisibilityTab";
+import UploadHeader from "@/components/create/upload-video/UploadHeader";
 import UploadTabs from "@/components/create/upload-video/UploadTabs";
+import { useUploadForm } from "@/hooks/useUploadForm";
 
 export default function EditVideoScreen() {
   const { colors } = useTheme();

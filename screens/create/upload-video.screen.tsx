@@ -1,42 +1,45 @@
-import React, { useRef, useState } from "react";
+import { useTheme } from "@/context/ThemeContext";
+import { useVideoUpload } from "@/hooks/useVideoUpload";
+import { UploadTab } from "@/types/upload.types";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useRef, useState } from "react";
 import {
-  Text,
-  TouchableOpacity,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Animated,
-  Alert,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/context/ThemeContext";
-import { useVideoUpload } from "@/hooks/useVideoUpload";
-import { useRouter } from "expo-router";
-import { UploadTab } from "@/types/upload.types";
 
+import { ChaptersTab } from "@/components/create/upload-video/components/tabs/ChaptersTab";
+import { DetailsTab } from "@/components/create/upload-video/components/tabs/DetailsTab";
+import { MoreTab } from "@/components/create/upload-video/components/tabs/MoreTab";
+import { VisibilityTab } from "@/components/create/upload-video/components/tabs/VisibilityTab";
 import UploadHeader from "@/components/create/upload-video/UploadHeader";
 import UploadProgress from "@/components/create/upload-video/UploadProgress";
-import { useUploadForm } from "@/components/create/upload-video/hook/useUploadForm";
-import { DetailsTab } from "@/components/create/upload-video/components/tabs/DetailsTab";
-import { ChaptersTab } from "@/components/create/upload-video/components/tabs/ChaptersTab";
-import { VisibilityTab } from "@/components/create/upload-video/components/tabs/VisibilityTab";
-import { MoreTab } from "@/components/create/upload-video/components/tabs/MoreTab";
 import UploadTabs from "@/components/create/upload-video/UploadTabs";
+import { UploadProgressCircle } from "@/components/UploadProgressCircle";
+import { useUploadForm } from "@/hooks/useUploadForm";
 
 
 
 export default function UploadVideoScreen() {
   const { colors } = useTheme();
-  const { video, uploadProgress, pickVideo, updateProgress } = useVideoUpload();
+  const { video, uploadProgress, pickVideo } = useVideoUpload();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<UploadTab>("details");
   const [thumbnail, setThumbnail] = useState<string | null>(null);
 
   const {
+    loading, progress, message,
     form,
     visibility, setVisibility,
     chapters, addChapter, updateChapter, removeChapter,
+    onSubmit
   } = useUploadForm(video);
 
 
@@ -54,33 +57,7 @@ export default function UploadVideoScreen() {
 
   // ── handleUpload Video ────────────────────────────────────────────────────────────────────
 
-const handleUpload = handleSubmit(async (data) => {
-  if (!video) {
-    Alert.alert("No Video", "Please select a video first.");
-    return;
-  }
 
-  try {
-    updateProgress(0);
-    console.log("Form Data:=============>", data);
-    console.log("Video:", video);
-    console.log("Thumbnail:", thumbnail);
-    console.log("Visibility:", visibility);
-    console.log("Chapters:", chapters);
-
-    updateProgress(null);
-
-    // router.push("/upload");
-
-  } catch (err: any) {
-    updateProgress(null);
-
-    Alert.alert(
-      "Upload Failed",
-      err?.message ?? "Something went wrong."
-    );
-  }
-});
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -154,14 +131,40 @@ const handleUpload = handleSubmit(async (data) => {
           )}
 
           <TouchableOpacity
-          onPress={handleUpload}
+            onPress={handleSubmit(onSubmit)}
             disabled={isSubmitting}
             style={[styles.uploadBtn, { backgroundColor: colors.accent }]}
             activeOpacity={0.85}
           >
             <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
             <Text style={styles.uploadBtnText}>
-              {isSubmitting ? "Uploading…" : "Upload Video"}
+              {loading ? <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(0,0,0,0.8)",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <UploadProgressCircle progress={progress} />
+
+                <Text
+                  style={{
+                    color: "#fff",
+                    marginTop: 20,
+                    fontSize: 16,
+                  }}
+                >
+                  {message}
+                </Text>
+              </View> : <Text> Upload</Text>
+
+
+              }
             </Text>
           </TouchableOpacity>
 

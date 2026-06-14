@@ -19,7 +19,7 @@ import { authService } from "@/services/auth/auth.service";
 
 export type { User };
 
-type AuthContextType = {
+export type AuthContextType = {
   user: User | null;
   hasCompletedOnboarding: boolean;
    setHasCompletedOnboarding: (value: boolean) => void;
@@ -29,7 +29,7 @@ type AuthContextType = {
   logout: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({
   children,
