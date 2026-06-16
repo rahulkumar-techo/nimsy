@@ -1,7 +1,5 @@
 import { ScrollView, Text, View } from "react-native";
-import SeeAll from "../SeeAll";
-import CategoryCard from "../home-comp/CategoryCard";
-import { useRouter } from "expo-router";
+// import CategoryCard from "../home-comp/CategoryCard";
 import { useTheme } from "@/context/ThemeContext";
 
 type Item = {
@@ -16,23 +14,10 @@ type Props = {
   onItemPress?: (item: Item) => void;
 };
 
-const ExploreTopCategories = ({ items, onItemPress }: Props) =>{
-    const router = useRouter();
-    const { colors } = useTheme();
-  
-   const handleCategory = (
-    title: string,
-    id: string
-  ) => {
-    router.push({
-      pathname: "/category",
-      params: {
-        id,
-        title,
-      },
-    });
-  };
-  return  (
+const ExploreTopCategories = ({ items, onItemPress }: Props) => {
+  const { colors } = useTheme();
+
+  return (
   <View className="mt-8 px-5">
     <View className="mb-4 flex-row items-center justify-between">
       <Text
@@ -41,7 +26,7 @@ const ExploreTopCategories = ({ items, onItemPress }: Props) =>{
       >
         Top Categories
       </Text>
-       <SeeAll
+       {/* <SeeAll
           title="Top Categories"
           
           data={items}
@@ -53,21 +38,21 @@ const ExploreTopCategories = ({ items, onItemPress }: Props) =>{
             onPress={() => handleCategory(item.title, item.id as any)}
           />
           )}
-        />
+        /> */}
     </View>
 
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      {items.slice(0,5).map((item) => (
+      {/* {items.slice(0,5).map((item) => (
          <CategoryCard
             
             key={item.id ?? item.title}
             {...item}
             onPress={() => handleCategory(item.title, item.id as any)}
           />
-      ))}
+      ))} */}
     </ScrollView>
   </View>
-)
-}
+  );
+};
 
 export default ExploreTopCategories;

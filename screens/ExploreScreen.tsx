@@ -31,15 +31,12 @@ import {
   stories,
 } from "@/constants/story";
 
-import {
-  CONTINUE_DATA,
-} from "./home";
+
 
 import SearchCard from "@/components/SearchCard";
 import ExploreAudioStories from "../components/explore/ExploreAudioStories";
 import ExploreByAge from "../components/explore/ExploreByAge";
 import ExploreCategories from "../components/explore/ExploreCategories";
-import ExploreContinueWatching from "../components/explore/ExploreContinueWatching";
 import ExploreHeader from "../components/explore/ExploreHeader";
 import ExploreNewTrending from "../components/explore/ExploreNewTrending";
 import ExplorePopularSearches from "../components/explore/ExplorePopularSearches";
@@ -305,15 +302,7 @@ const ExploreScreen = () => {
                 }}
               />
 
-              <ExploreContinueWatching
-                data={
-                  CONTINUE_DATA
-                }
-                limit={2}
-                horizontal
-                scrollEnabled
-              />
-
+         
               <ExploreNewTrending
                 items={trending}
               />
