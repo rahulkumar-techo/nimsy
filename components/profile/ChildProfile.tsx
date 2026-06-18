@@ -3,7 +3,7 @@
  * Displays child avatar, achievements, and profile menu items
  */
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 import {
   Image,
@@ -46,21 +46,11 @@ const ChildProfile = () => {
   const { colors } = useTheme();
   const { user, setUser } = useAuth();
 
-  const [avatarUrl, setAvatarUrl] =
-    useState(user?.photo ?? "")
-
-  useEffect(() => {
-    setAvatarUrl(user?.photo ?? "")
-  }, [user])
-
-  const resolvedAvatar =
-    avatarUrl.trim() || CHILD_AVATAR
+  const resolvedAvatar = (user?.photo ?? "").trim() || CHILD_AVATAR;
 
   const handleSelectAvatar = async (
     selectedAvatar: string
   ) => {
-    setAvatarUrl(selectedAvatar)
-
     if (!user) return
 
     await setUser({

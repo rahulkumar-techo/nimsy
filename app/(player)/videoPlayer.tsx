@@ -15,13 +15,11 @@ export default function VideoPlayerScreen() {
     const {
         uri,
         title,
-        thumbnail,
         channelName,
         views,
     } = useLocalSearchParams<{
         uri: string;
         title?: string;
-        thumbnail?: string;
         channelName?: string;
         views?: string;
     }>();

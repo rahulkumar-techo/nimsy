@@ -2,7 +2,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { UploadTab } from "@/types/upload.types";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Alert,
     Animated,
@@ -38,7 +38,7 @@ export default function EditVideoScreen() {
 
   const { control, handleSubmit, formState: { errors, isSubmitting } } = form;
 
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const [scrollY] = useState(() => new Animated.Value(0));
 
   const inputStyle = [
     styles.input,

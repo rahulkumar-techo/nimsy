@@ -3,7 +3,7 @@
  * Optimized YouTube-style video card
  */
 
-import React, { useCallback } from "react";
+import React from "react";
 
 import { router } from "expo-router";
 import { CheckCircle2, EllipsisVertical } from "lucide-react-native";

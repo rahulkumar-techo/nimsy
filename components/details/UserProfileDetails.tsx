@@ -1,4 +1,5 @@
 import React, {
+  startTransition,
   useEffect,
   useState,
 } from "react"
@@ -32,11 +33,13 @@ export default function UserProfileDetails() {
   // const { me } = useAuthActions();
 
 
-
-  useEffect(() => {
-    setName(user?.name ?? "")
-    setAvatarUrl(user?.photo ?? "")
-  }, [user])
+useEffect(() => {
+  if (user) {
+    startTransition(() => {
+      setName(user.name ?? "");
+    });
+  }
+}, [user]);
 
 
 

@@ -2,7 +2,7 @@
  * UploadProgress overlay
  */
 
-import  { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, Animated, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/context/ThemeContext";
@@ -13,7 +13,7 @@ type Props = {
 
 export default function UploadProgress({ progress }: Props) {
   const { colors } = useTheme();
-  const anim = useRef(new Animated.Value(0)).current;
+const [anim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(anim, {
@@ -68,7 +68,7 @@ export default function UploadProgress({ progress }: Props) {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",

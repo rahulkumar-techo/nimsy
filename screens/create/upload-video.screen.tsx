@@ -3,7 +3,7 @@ import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { UploadTab } from "@/types/upload.types";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Animated,
   KeyboardAvoidingView,
@@ -47,7 +47,7 @@ export default function UploadVideoScreen() {
 
   // ── Animated video collapse on scroll ───────────────────────────────────────
 
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollY = useMemo(() => new Animated.Value(0), []);
 
 
   const inputStyle = [
