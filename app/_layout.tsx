@@ -6,8 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 
-const SKIP_AUTH =
-  __DEV__ && process.env.EXPO_PUBLIC_SKIP_AUTH === "true";
+const SKIP_AUTH = process.env.EXPO_PUBLIC_SKIP_AUTH === "true";
 
 function RootNavigator() {
   const { theme, colors } = useTheme();
@@ -55,13 +54,13 @@ const mockAuthValue: AuthContextType = {
 };
 
 function AppProviders({ children }: React.PropsWithChildren) {
-  if (SKIP_AUTH) {
-    return (
-      <AuthContext.Provider value={mockAuthValue}>
-        {children}
-      </AuthContext.Provider>
-    );
-  }
+  // if (SKIP_AUTH) {
+  //   return (
+  //     <AuthContext.Provider value={mockAuthValue}>
+  //       {children}
+  //     </AuthContext.Provider>
+  //   );
+  // }
 
   return <AuthProvider>{children}</AuthProvider>;
 }

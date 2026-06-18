@@ -1,23 +1,15 @@
+/**
+ * Upload form hook for video metadata and multipart upload flow
+ */
+
 import { useState } from "react";
 import { Alert } from "react-native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
 import { Chapter, VisibilityOption } from "@/types/upload.types";
 import { videoService } from "@/services/video/video.service";
-
-
-
-const logStep = (step: string, data: any) => {
-  console.log(`\n─── ${step} ───`);
-  console.log(JSON.stringify(data, null, 2));
-};
-
-const logError = (step: string, error: any) => {
-  console.log(`\n─── ${step} ERROR ───`);
-  console.error(error);
-};
-
 
 const schema = z.object({
   title: z.string().min(3, "At least 3 characters").max(100),
@@ -30,15 +22,22 @@ const schema = z.object({
 
 export type FormData = z.infer<typeof schema>;
 
+const logStep = (step: string, data?: unknown) => {
+  console.log(`\n─── ${step} ───`);
+  if (data) console.log(JSON.stringify(data, null, 2));
+};
+
 export function useUploadForm(video: any) {
-  const [visibility, setVisibility] = useState<VisibilityOption>("public");
+  const [visibility, setVisibility] =
+    useState<VisibilityOption>("public");
+
   const [chapters, setChapters] = useState<Chapter[]>([
     { id: "1", time: "0:00", title: "Intro" },
   ]);
-  const [progress, setProgress] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
 
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState("");
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -52,23 +51,77 @@ export function useUploadForm(video: any) {
     },
   });
 
+  // Add chapter
   const addChapter = () =>
     setChapters((prev) => [
       ...prev,
-      { id: Date.now().toString(), time: "0:00", title: "" },
+      {
+        id: Date.now().toString(),
+        time: "0:00",
+        title: "",
+      },
     ]);
 
-  const updateChapter = (id: string, field: "time" | "title", value: string) =>
+  // Update chapter field
+  const updateChapter = (
+    id: string,
+    field: "time" | "title",
+    value: string
+  ) =>
     setChapters((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
+      prev.map((chapter) =>
+        chapter.id === id
+          ? { ...chapter, [field]: value }
+          : chapter
+      )
     );
 
+  // Remove chapter
   const removeChapter = (id: string) =>
-    setChapters((prev) => prev.filter((c) => c.id !== id));
+    setChapters((prev) =>
+      prev.filter((chapter) => chapter.id !== id)
+    );
 
+  // Poll backend processing status
+  const pollUploadStatus = (videoId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const status =
+          await videoService.getUploadStatus(videoId);
+
+        setMessage(status.status);
+
+        if (status.isCompleted) {
+          clearInterval(interval);
+
+          setProgress(100);
+
+          Alert.alert(
+            "Success",
+            "Video processing completed."
+          );
+        }
+      } catch (error) {
+        clearInterval(interval);
+
+        console.error(
+          "Status polling failed",
+          error
+        );
+      }
+    }, 3000);
+
+    return interval;
+  };
+
+  // Submit upload
   const onSubmit = async (data: FormData) => {
+    console.log(video)
     if (!video) {
-      Alert.alert("No Video", "Please select a video.");
+      Alert.alert(
+        "No Video",
+        "Please select a video."
+      );
       return;
     }
 
@@ -76,71 +129,50 @@ export function useUploadForm(video: any) {
       setLoading(true);
       setProgress(0);
 
-      logStep("INIT", { video, data });
+      logStep("INIT", {
+        title: data.title,
+        fileName: video.name,
+      });
 
-      setMessage("Preparing upload...");
-
+      setMessage("Reading video...");
+      console.log("1");
+      // Load local file
       const response = await fetch(video.uri);
-      const file = await response.blob();
+      console.log("2", response);
+      const fileBuffer = await response.arrayBuffer();
 
-      if (!file || file.size === 0) {
+      console.log("BUFFER SIZE", fileBuffer.byteLength);
+      if (!fileBuffer.byteLength) {
         throw new Error("Invalid video file");
       }
 
-      logStep("FILE_LOADED", {
-        size: file.size,
-        type: file.type,
-        hasSlice: typeof file.slice,
-        hasArrayBuffer: typeof (file as any).arrayBuffer,
-      });
-
-      setMessage("Creating upload session...");
-
-      const upload = await videoService.requestPresignedUrls({
-        title: data.title,
-        description: data.description,
-        fileName: video.name,
-        mimeType: video.mimeType,
-        fileSize: video.size,
-      });
-
-      logStep("UPLOAD_SESSION", {
-        videoId: upload.videoId,
-        uploadId: upload.uploadId,
-        totalChunks: upload.totalChunks,
-        chunkSize: upload.chunkSize,
-      });
-
       setMessage("Uploading video...");
 
-      const parts = await videoService.uploadChunks(
-        file,
-        upload,
-        (progress) => {
-          setProgress(progress);
-          setMessage(`Uploading ${progress}%`);
-        }
-      );
+      // Execute full multipart upload
+      const { upload } =
+        await videoService.uploadVideo(
+          fileBuffer,
+          {
+            title: data.title,
+            description: data.description,
+            fileName: video.name,
+            mimeType: video.mimeType,
+            fileSize: video.size,
+          },
+          (progress, _, message) => {
+            setProgress(progress);
+            setMessage(message);
+          }
+        );
 
-      logStep("CHUNKS_UPLOADED", parts);
-
-      setMessage("Finalizing upload...");
-
-      await videoService.completeUpload({
+      logStep("UPLOAD_COMPLETED", {
         videoId: upload.videoId,
-        uploadId: upload.uploadId,
-        parts,
       });
 
-      setProgress(100);
-      setMessage("Video processing started");
-
-      Alert.alert(
-        "Success",
-        "Video uploaded successfully."
-      );
+      // Start processing tracking
+      pollUploadStatus(upload.videoId);
     } catch (error) {
-      logError("UPLOAD_FAILED", error);
+      console.error(error);
 
       Alert.alert(
         "Upload Failed",
@@ -155,10 +187,19 @@ export function useUploadForm(video: any) {
 
   return {
     form,
-    visibility, setVisibility,
+
+    visibility,
+    setVisibility,
+
     chapters,
-    addChapter, updateChapter, removeChapter,
+    addChapter,
+    updateChapter,
+    removeChapter,
+
+    progress,
+    message,
+    loading,
+
     onSubmit,
-    loading, progress, message
   };
 }

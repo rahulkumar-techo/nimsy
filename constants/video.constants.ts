@@ -1,6 +1,7 @@
 
 
 export const VIDEO_ENDPOINTS = {
- INITUPLOAD:"/videos/init-upload",
- COMPLETEUPLOAD:"/videos/completed"
+ INITUPLOAD:"/videos/upload/init",
+ COMPLETEUPLOAD:"/videos/upload/complete",
 } as const;
+

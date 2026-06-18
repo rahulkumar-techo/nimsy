@@ -1,3 +1,7 @@
+/**
+ * Video multipart upload service
+ */
+
 import axiosInstance from "@/lib/api";
 import { VIDEO_ENDPOINTS } from "@/constants/video.constants";
 
@@ -20,7 +24,6 @@ export interface UploadedPart {
 }
 
 export interface InitUploadResponse {
-  success: boolean;
   videoId: string;
   uploadSessionId: string;
   uploadId: string;
@@ -36,26 +39,27 @@ export interface CompleteUploadPayload {
   parts: UploadedPart[];
 }
 
-export type UploadStatus =
-  | "INITIALIZING"
-  | "UPLOADING"
-  | "COMPLETING"
-  | "PROCESSING"
-  | "SUCCESS";
+export interface UploadStatusResponse {
+  status: string;
+  progress: number;
+  uploadedChunks: number;
+  totalChunks: number;
+  remainingChunks: number;
+  isCompleted: boolean;
+}
 
 export type UploadCallback = (
   progress: number,
-  status: UploadStatus,
+  status: string,
   message: string
 ) => void;
 
 class VideoService {
+  // Create upload session
   async requestPresignedUrls(
     payload: PresignedMetadata
   ): Promise<InitUploadResponse> {
-    const { data } = await axiosInstance.post<{
-      data: InitUploadResponse;
-    }>(
+    const { data } = await axiosInstance.post(
       VIDEO_ENDPOINTS.INITUPLOAD,
       payload
     );
@@ -63,14 +67,11 @@ class VideoService {
     return data.data;
   }
 
+  // Upload single chunk to S3
   async uploadChunk(
     url: string,
-    chunk: Blob
+    chunk: ArrayBuffer
   ): Promise<string> {
-    console.log("Uploading chunk", {
-      size: chunk.size,
-    });
-
     const response = await fetch(url, {
       method: "PUT",
       body: chunk,
@@ -87,20 +88,34 @@ class VideoService {
     }
 
     const etag =
-      response.headers.get("etag") ||
+      response.headers.get("etag") ??
       response.headers.get("ETag");
 
     if (!etag) {
-      throw new Error(
-        "ETag missing from S3 response"
-      );
+      throw new Error("ETag missing");
     }
 
     return etag.replace(/"/g, "");
   }
 
+  // Save uploaded chunk metadata
+  async chunkUploadCompleted(
+    videoId: string,
+    etag: string,
+    partNumber: number
+  ) {
+    await axiosInstance.post(
+      `/videos/${videoId}/upload/chunks`,
+      {
+        etag,
+        partNumber,
+      }
+    );
+  }
+
+  // Upload all chunks
   async uploadChunks(
-    file: Blob,
+    file: ArrayBuffer,
     upload: InitUploadResponse,
     onProgress?: (progress: number) => void
   ): Promise<UploadedPart[]> {
@@ -112,27 +127,20 @@ class VideoService {
       const start = i * upload.chunkSize;
       const end = Math.min(
         start + upload.chunkSize,
-        file.size
+        file.byteLength
       );
 
       const chunk = file.slice(start, end);
 
-      console.log("Chunk info", {
-        partNumber: part.partNumber,
-        start,
-        end,
-        chunkSize: chunk.size,
-      });
-
-      if (chunk.size === 0) {
-        throw new Error(
-          `Chunk ${part.partNumber} is empty`
-        );
-      }
-
       const etag = await this.uploadChunk(
         part.url,
         chunk
+      );
+
+      await this.chunkUploadCompleted(
+        upload.videoId,
+        etag,
+        part.partNumber
       );
 
       parts.push({
@@ -150,6 +158,7 @@ class VideoService {
     return parts;
   }
 
+  // Complete multipart upload
   async completeUpload(
     payload: CompleteUploadPayload
   ) {
@@ -161,8 +170,20 @@ class VideoService {
     return data.data;
   }
 
+  // Get processing status
+  async getUploadStatus(
+    videoId: string
+  ): Promise<UploadStatusResponse> {
+    const { data } = await axiosInstance.get(
+      `/videos/${videoId}/upload/status`
+    );
+
+    return data.data;
+  }
+
+  // Full upload workflow
   async uploadVideo(
-    file: Blob,
+    file: any,
     metadata: PresignedMetadata,
     onUpdate?: UploadCallback
   ) {
@@ -175,22 +196,15 @@ class VideoService {
     const upload =
       await this.requestPresignedUrls(metadata);
 
-    onUpdate?.(
-      0,
-      "UPLOADING",
-      "Uploading video..."
-    );
-
     const parts = await this.uploadChunks(
       file,
       upload,
-      (progress) => {
+      (progress) =>
         onUpdate?.(
           progress,
           "UPLOADING",
           `Uploading ${progress}%`
-        );
-      }
+        )
     );
 
     onUpdate?.(
@@ -208,7 +222,7 @@ class VideoService {
     onUpdate?.(
       100,
       "PROCESSING",
-      "Video is being processed..."
+      "Video processing..."
     );
 
     return {
