@@ -23,7 +23,7 @@ import UploadHeader from "@/components/create/upload-video/UploadHeader";
 import UploadProgress from "@/components/create/upload-video/UploadProgress";
 import UploadTabs from "@/components/create/upload-video/UploadTabs";
 import { UploadProgressCircle } from "@/components/UploadProgressCircle";
-import { useUploadForm } from "@/hooks/useUploadForm";
+import { useUploadForm } from "@/features/upload/hooks/useUploadForm";
 
 
 

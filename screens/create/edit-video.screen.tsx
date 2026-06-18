@@ -20,7 +20,7 @@ import { MoreTab } from "@/components/create/upload-video/components/tabs/MoreTa
 import { VisibilityTab } from "@/components/create/upload-video/components/tabs/VisibilityTab";
 import UploadHeader from "@/components/create/upload-video/UploadHeader";
 import UploadTabs from "@/components/create/upload-video/UploadTabs";
-import { useUploadForm } from "@/hooks/useUploadForm";
+import { useUploadForm } from "@/features/upload/hooks/useUploadForm";
 
 export default function EditVideoScreen() {
   const { colors } = useTheme();
