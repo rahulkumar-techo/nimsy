@@ -35,7 +35,7 @@ const ACHIEVEMENTS = [
 ];
 
 const MENU_ITEMS = [
-  { title: "My Videos", icon: "book" as const, link: "/(videos)/videos" as const },
+  { title: "My Contents", icon: "book" as const, link: "/(content)/videos" as const },
   { title: "My Favorites", icon: "heart" as const, link: "/favorites" as const },
   { title: "Downloads", icon: "download" as const, link: "/downloads" as Href },
   { title: "Watch History", icon: "time" as const },

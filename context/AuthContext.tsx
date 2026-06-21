@@ -46,7 +46,10 @@ export const AuthProvider = ({
   const refreshUser = useCallback(async () => {
     console.log("REFRESH USER CALLED");
     try {
+      console.log("BEFORE API CALL");
+
       const response = await authService.getProfile();
+console.log("After API CALL");
 
       if (!response?.data) {
         setUserState(null);
@@ -69,10 +72,13 @@ export const AuthProvider = ({
    * Restore authentication state on app launch
    */
 useEffect(() => {
+    console.log("AUTH EFFECT RUN");
   const initializeAuth = async () => {
+     console.log("INIT START");
     try {
       const accessToken =
         await authStorage.getAccessToken();
+        console.log(accessToken)
 
       if (accessToken) {
         await refreshUser();
