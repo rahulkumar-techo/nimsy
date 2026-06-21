@@ -1,7 +1,9 @@
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { store } from "@/store/store";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Provider } from "react-redux";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
@@ -36,7 +38,11 @@ function RootNavigator() {
 }
 
 function AppProviders({ children }: React.PropsWithChildren) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <Provider store={store}>
+      <AuthProvider>{children}</AuthProvider>
+    </Provider>
+  );
 }
 
 export default function RootLayout() {

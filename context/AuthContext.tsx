@@ -5,17 +5,17 @@
 
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-  useCallback,
+    createContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useState,
 } from "react";
 
-import { authStorage, User } from "@/utils/auth-storage";
+import { authStorage, User } from "@/features/auth/utils/auth-storage";
 // import { useAuthActions } from "@/hooks/useAuthActions";
-import { authService } from "@/services/auth/auth.service";
+import { authService } from "@/features/auth/services/auth.service";
 
 export type { User };
 

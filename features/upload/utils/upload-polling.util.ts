@@ -1,4 +1,4 @@
-import { videoService } from "@/services/video/video.service";
+import { videoService } from "@/features/upload/services/video.service";
 
 /**
  * Start polling the server for video upload processing status.

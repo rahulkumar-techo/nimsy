@@ -4,8 +4,8 @@
 
 import { configureStore } from "@reduxjs/toolkit";
 
-import uploadReducer from "@/features/upload/redux/upload.slice";
-import feedReducer from "@/store/feed/feed.slice"
+import feedReducer from "@/features/home/store/feed.slice";
+import uploadReducer from "@/features/upload/store/upload.slice";
 
 
 export const store = configureStore({

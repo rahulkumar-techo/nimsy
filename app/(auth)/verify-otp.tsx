@@ -2,7 +2,7 @@
  * Verify OTP Route
  */
 
-import VerifyOTPScreen from "@/screens/auth/VerifyOTPScreen";
+import VerifyOTPScreen from "@/features/auth/screens/auth/VerifyOTPScreen";
 
 export default function VerifyOTP() {
   return <VerifyOTPScreen />;

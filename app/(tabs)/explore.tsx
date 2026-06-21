@@ -1,1 +1,1 @@
-export { default } from "../../screens/ExploreScreen";
+export { default } from "@/features/explore/screens/ExploreScreen";

@@ -18,6 +18,14 @@ export const uploadSchema = z.object({
   allowComments: z.boolean(),
 
   allowRatings: z.boolean(),
+
+  chapters: z.array(
+    z.object({
+      id: z.string(),
+      time: z.string().regex(/^(?:\d{1,2}:)?\d{1,2}:\d{2}$/, "Invalid time format (e.g., 0:00 or 1:23:45)"),
+      title: z.string().min(1, "Chapter title cannot be empty").max(100),
+    })
+  ),
 });
 
 export type UploadFormData = z.infer<typeof uploadSchema>;

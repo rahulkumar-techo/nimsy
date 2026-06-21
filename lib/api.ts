@@ -7,12 +7,12 @@
  * storage was empty, causing a null-snap on next mount.
  */
 
+import { authStorage } from "@/features/auth/utils/auth-storage";
 import axios, {
-  AxiosInstance,
-  InternalAxiosRequestConfig,
-  create
+    AxiosInstance,
+    InternalAxiosRequestConfig,
+    create
 } from "axios";
-import { authStorage } from "@/utils/auth-storage";
 
 const API_BASE_URL = "http://10.189.245.170:5000/api/v1";
 

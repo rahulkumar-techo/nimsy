@@ -40,6 +40,8 @@ export default function NimsyVideoPlayer({
 
     const insets = useSafeAreaInsets();
 
+    console.log("===============>",uri)
+
     // ─── Player ───────────────────────────────────────────────
     const player = useVideoPlayer(uri, (player) => {
         player.loop = loop;

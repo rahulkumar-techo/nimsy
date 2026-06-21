@@ -2,7 +2,7 @@
  * Forgot Password Route
  */
 
-import RegisterScreen from "@/screens/auth/RegisterScreen";
+import RegisterScreen from "@/features/auth/screens/auth/RegisterScreen";
 
 
 

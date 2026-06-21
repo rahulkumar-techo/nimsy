@@ -2,7 +2,7 @@
  * Success Route
  */
 
-import SuccessScreen from "@/screens/auth/SuccessScreen";
+import SuccessScreen from "@/features/auth/screens/auth/SuccessScreen";
 
 export default function Success() {
   return <SuccessScreen />;

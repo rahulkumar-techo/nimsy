@@ -1,12 +1,12 @@
 /**
  * Video Card
- * Optimized YouTube-style video card
+ * Optimized YouTube-style video card — backed by the real API video shape
  */
 
 import React from "react";
 
 import { router } from "expo-router";
-import { CheckCircle2, EllipsisVertical } from "lucide-react-native";
+import { EllipsisVertical } from "lucide-react-native";
 import {
   Image,
   Pressable,
@@ -14,29 +14,39 @@ import {
   View,
 } from "react-native";
 
-import { Video } from "@/constants/videos";
 import { useTheme } from "@/context/ThemeContext";
+import { ApiVideo } from "@/features/home/types/video";
+import { getMediaUrl } from "@/features/home/utils/media";
+import { formatCount, formatRelativeTime } from "@/features/home/utils/format";
+
 
 interface Props {
-  item: Video;
+  item: ApiVideo;
 }
 
 function VideoCard({ item }: Props) {
   const { colors } = useTheme();
 
+  // // const isProcessing = item.status === "PROCESSING";
+  // const isFailed = item.status === "FAILED";
+
+  const thumbnailUrl = getMediaUrl(item.thumbnailKey);
+  const avatarUrl = item.uploadedBy.avatarUrl ? getMediaUrl(item.uploadedBy.avatarUrl) : null;
+  const videoUrl = getMediaUrl(item.objectKey);
+
   const handleRedirect = () => {
+    if (!videoUrl) return;
+
     router.push({
       pathname: "/(player)/videoPlayer",
       params: {
         id: item.id,
-        uri: item.uri,
+        uri: videoUrl,
         title: item.title,
-        thumbnail: item.thumbnail,
-        channelName: item.channelName,
-        views: item.views,
-        duration: item.duration,
-        uploadedAt: item.uploadedAt,
-        verified: String(item.verified),
+        thumbnail: thumbnailUrl,
+        channelName: item.uploadedBy.name,
+        views: String(item.viewsCount),
+        uploadedAt: item.createdAt,
       },
     });
   };
@@ -44,53 +54,43 @@ function VideoCard({ item }: Props) {
   return (
     <Pressable
       onPress={handleRedirect}
-      android_ripple={{
-        color: colors.border,
-      }}
+      android_ripple={{ color: colors.border }}
       className="mb-4"
     >
       {/* Thumbnail */}
       <View className="relative">
         <Image
-          source={{ uri: item.thumbnail }}
+          source={{ uri: thumbnailUrl }}
           resizeMode="cover"
           className="w-full h-56"
+          style={{ backgroundColor: colors.border }}
         />
 
-        {/* Duration */}
-        <View
-          className="absolute bottom-2 right-2 px-2 py-1 rounded-md"
-          style={{
-            backgroundColor: "rgba(0,0,0,0.85)",
-          }}
-        >
-          <Text
-            className="text-[11px] font-semibold"
-            style={{
-              color: "#fff",
-            }}
-          >
-            {item.duration}
-          </Text>
-        </View>
+        
       </View>
 
       {/* Metadata */}
       <View className="flex-row px-3 py-3">
         {/* Avatar */}
-        <Image
-          source={{ uri: item.channelAvatar }}
-          className="w-11 h-11 rounded-full"
-        />
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} className="w-11 h-11 rounded-full" />
+        ) : (
+          <View
+            className="w-11 h-11 rounded-full items-center justify-center"
+            style={{ backgroundColor: colors.border }}
+          >
+            <Text style={{ color: colors.text, fontWeight: "600" }}>
+              {item.uploadedBy.name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
 
         {/* Content */}
         <View className="flex-1 ml-3">
           <Text
             numberOfLines={2}
             className="text-[15px] font-semibold leading-5"
-            style={{
-              color: colors.text,
-            }}
+            style={{ color: colors.text }}
           >
             {item.title}
           </Text>
@@ -99,42 +99,20 @@ function VideoCard({ item }: Props) {
             <Text
               numberOfLines={1}
               className="text-sm"
-              style={{
-                color: colors.secondaryText,
-              }}
+              style={{ color: colors.secondaryText }}
             >
-              {item.channelName}
+              {item.uploadedBy.name}
             </Text>
-
-            {item.verified && (
-              <View className="ml-1">
-                <CheckCircle2
-                  size={13}
-                  color={colors.secondaryText}
-                />
-              </View>
-            )}
           </View>
 
-          <Text
-            className="text-xs mt-1"
-            style={{
-              color: colors.secondaryText,
-            }}
-          >
-            {item.views} views • {item.uploadedAt}
+          <Text className="text-xs mt-1" style={{ color: colors.secondaryText }}>
+            {formatCount(item.viewsCount)} views • {formatRelativeTime(item.createdAt)}
           </Text>
         </View>
 
         {/* Menu */}
-        <Pressable
-          hitSlop={12}
-          className="justify-start pt-1"
-        >
-          <EllipsisVertical
-            size={20}
-            color={colors.secondaryText}
-          />
+        <Pressable hitSlop={12} className="justify-start pt-1">
+          <EllipsisVertical size={20} color={colors.secondaryText} />
         </Pressable>
       </View>
     </Pressable>

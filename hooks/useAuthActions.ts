@@ -6,13 +6,13 @@
 
 import { useState } from "react";
 
-import {authService} from "@/services/auth/auth.service";
+import { authService } from "@/features/auth/services/auth.service";
 
 import {
     LoginPayload,
     RegisterPayload,
     ResetPasswordPayload,
-} from "@/types/auth.types";
+} from "@/features/auth/auth.types";
 
  export function useAuthActions() {
     const [loading, setLoading] = useState(false);

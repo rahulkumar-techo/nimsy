@@ -1,5 +1,5 @@
 import { Redirect } from "expo-router"
-import Onboarding from "@/screens/onboarding"
+import Onboarding from "@/features/onboarding/screens/onboarding"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useAuth } from "@/context/AuthContext"
 
