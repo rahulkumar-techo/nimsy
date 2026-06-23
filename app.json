@@ -59,13 +59,16 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses your photos to let you share them with your friends.",
+          "photosPermission": "The app accesses your photos to let you choose a video thumbnail.",
           "colors": {
             "cropToolbarColor": "#000000"
           },
           "dark": {
             "colors": {
-              "cropToolbarColor": "#000000"
+              "cropToolbarColor": "#18181b",
+              "cropToolbarIconColor": "#ffffff",
+              "cropToolbarActionTextColor": "#ffffff",
+              "cropBackgroundColor": "#000000"
             }
           }
         }

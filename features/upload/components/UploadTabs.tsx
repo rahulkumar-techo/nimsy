@@ -1,79 +1,64 @@
-/**
- * UploadTabs — underline-style tab bar
- */
-
-import { useTheme } from "@/context/ThemeContext";
-import { UploadTab } from "@/types/upload-video.types";
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
-
-
-const TABS: { id: UploadTab; label: string }[] = [
-  { id: "details",    label: "Details"    },
-  { id: "chapters",   label: "Chapters"   },
-  { id: "visibility", label: "Visibility" },
-  { id: "more",       label: "More"       },
-];
+import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import type { UploadTab } from "@/types/upload-video.types";
 
 type Props = {
   activeTab: UploadTab;
   onChange: (tab: UploadTab) => void;
+  colors: any;
 };
 
-export default function UploadTabs({ activeTab, onChange }: Props) {
-  const { colors } = useTheme();
+const TABS: { key: UploadTab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: "details", label: "Details", icon: "document-text-outline" },
+  { key: "chapters", label: "Chapters", icon: "list-outline" },
+  { key: "visibility", label: "Visibility", icon: "eye-outline" },
+  { key: "more", label: "More", icon: "ellipsis-horizontal-outline" },
+];
 
+export function UploadTabs({ activeTab, onChange, colors }: Props) {
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={[styles.bar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
-      contentContainerStyle={styles.content}
-    >
+    <View style={[styles.row, { borderBottomColor: colors.border }]}>
       {TABS.map((tab) => {
-        const active = activeTab === tab.id;
+        const isActive = activeTab === tab.key;
         return (
           <TouchableOpacity
-            key={tab.id}
-            onPress={() => onChange(tab.id)}
+            key={tab.key}
+            onPress={() => onChange(tab.key)}
             style={[
               styles.tab,
-              active
-                ? { borderBottomColor: colors.accent }
-                : { borderBottomColor: "transparent" },
+              isActive && [styles.activeTab, { borderBottomColor: colors.accent }],
             ]}
             activeOpacity={0.7}
           >
-            <Text
-              style={[
-                styles.tabText,
-                { color: active ? colors.accent : colors.secondaryText },
-              ]}
-            >
+            <Ionicons
+              name={tab.icon}
+              size={18}
+              color={isActive ? colors.accent : colors.mutedText}
+            />
+            <Text style={[styles.label, { color: isActive ? colors.accent : colors.mutedText }]}>
               {tab.label}
             </Text>
           </TouchableOpacity>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: {
-    maxHeight: 46,
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-around",
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  content: {
-    paddingHorizontal: 16,
-  },
   tab: {
-    marginRight: 24,
-    paddingVertical: 12,
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
+    gap: 4,
     borderBottomWidth: 2,
+    borderBottomColor: "transparent",
   },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
+  activeTab: {},
+  label: { fontSize: 12, fontWeight: "600" },
 });

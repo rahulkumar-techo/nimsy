@@ -1,27 +1,29 @@
-import React from "react";
-import { TouchableOpacity, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-type Props = { label: string; colors: any };
+type Props = {
+  label: string;
+  colors: any;
+};
 
-export const SelectMock = ({ label, colors }: Props) => (
-  <TouchableOpacity
-    style={[styles.selectMock, { backgroundColor: colors.surface, borderColor: colors.border }]}
-    activeOpacity={0.7}
-  >
-    <Text style={[styles.selectText, { color: colors.secondaryText }]}>{label}</Text>
-    <Ionicons name="chevron-down" size={16} color={colors.mutedText} />
-  </TouchableOpacity>
-);
+export function SelectMock({ label, colors }: Props) {
+  return (
+    <TouchableOpacity activeOpacity={0.7} style={[styles.select, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+      <Text style={[styles.text, { color: colors.mutedText }]}>{label}</Text>
+      <Text style={[styles.chevron, { color: colors.mutedText }]}>▼</Text>
+    </TouchableOpacity>
+  );
+}
 
 const styles = StyleSheet.create({
-  selectMock: {
+  select: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 13,
+    paddingVertical: 12,
   },
-  selectText: { flex: 1, fontSize: 14 },
+  text: { fontSize: 14 },
+  chevron: { fontSize: 12, fontWeight: "700" },
 });

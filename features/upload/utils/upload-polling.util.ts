@@ -1,59 +1,39 @@
-import { videoService } from "@/features/upload/services/video.service";
+import { getUploadStatus } from "../api/status";
+import type { VisibilityOption } from "../types/upload.types";
 
-/**
- * Start polling the server for video upload processing status.
- *
- * Why?
- * - After the upload finishes, the server may still be processing
- *   the video (transcoding, thumbnail generation, metadata extraction).
- * - This function periodically checks the latest processing status
- *   until the video is completed.
- *
- * Example:
- * const interval = startUploadPolling(
- *   videoId,
- *   (status) => {
- *     console.log(status.progress);
- *   }
- * );
- *
- * ! // Stop manually if needed
- * clearInterval(interval);
- *
- * Input:
- * - videoId: ID of the uploaded video.
- * - onStatus: Callback executed whenever a new status is received.
- *
- * Returns:
- * - Interval ID that can be used to stop polling manually.
- *
- * Auto Stops:
- * - When processing is completed.
- * - When a polling request fails.
- */
-export const startUploadPolling = (
-  videoId: string,
-  onStatus: (status: any) => void,
-) => {
-  const interval = setInterval(
-    async () => {
-      try {
-        const status =
-          await videoService.getUploadStatus(
-            videoId,
-          );
+export interface UploadStatusResponse {
+  status: string;
+  progress: number;
+  isCompleted: boolean;
+}
 
-        onStatus(status);
+export type StatusCallback = (status: UploadStatusResponse) => void;
 
-        if (status.isCompleted) {
-          clearInterval(interval);
-        }
-      } catch {
-        clearInterval(interval);
+const POLL_INTERVAL_MS = 2000;
+const MAX_POLLS = 60;
+
+export async function startUploadPolling(videoId: string, onStatus: StatusCallback): Promise<void> {
+  let attempts = 0;
+
+  while (attempts < MAX_POLLS) {
+    try {
+      const data = await getUploadStatus(videoId);
+      onStatus({
+        status: data.status,
+        progress: data.progress,
+        isCompleted: data.isCompleted,
+      });
+
+      if (data.isCompleted) {
+        return;
       }
-    },
-    3000,
-  );
+    } catch {
+      onStatus({ status: "polling", progress: 0, isCompleted: false });
+    }
 
-  return interval;
-};
+    attempts++;
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  onStatus({ status: "timeout", progress: 0, isCompleted: false });
+}

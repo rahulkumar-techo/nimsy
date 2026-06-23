@@ -1,84 +1,72 @@
 /**
- * UploadProgress overlay
+ * Upload progress component.
+ * Shows real-time upload progress to server/S3.
  */
 
-import { useEffect, useState } from "react";
-import { View, Text, Animated, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/context/ThemeContext";
+import React from "react";
+import { View, Text, ActivityIndicator } from "react-native";
 
-type Props = {
-  progress: number;
-};
+interface UploadProgressProps {
+  progress: number; // 0 - 100
+  uploadedBytes?: number;
+  totalBytes?: number;
+}
 
-export default function UploadProgress({ progress }: Props) {
-  const { colors } = useTheme();
-const [anim] = useState(() => new Animated.Value(0));
+export default function UploadProgress({
+  progress,
+  uploadedBytes,
+  totalBytes,
+}: UploadProgressProps) {
+  const formatBytes = (bytes?: number) => {
+    if (!bytes) return "";
 
-  useEffect(() => {
-    Animated.timing(anim, {
-      toValue: progress,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [progress,anim]);
+    const units = ["B", "KB", "MB", "GB"];
+    let value = bytes;
+    let index = 0;
 
-  const done = progress >= 100;
+    while (value >= 1024 && index < units.length - 1) {
+      value /= 1024;
+      index++;
+    }
+
+    return `${value.toFixed(1)} ${units[index]}`;
+  };
 
   return (
-    <View className="absolute inset-0 items-center justify-center" style={styles.overlay}>
-      <View className="w-4/5 rounded-3xl p-7 items-center" style={[styles.card, { backgroundColor: colors.card }]}>
-        <View className="w-16 h-16 rounded-3xl items-center justify-center" style={{ backgroundColor: done ? colors.success : colors.accentSurface }}>
-          <Ionicons
-            name={done ? "checkmark" : "cloud-upload-outline"}
-            size={32}
-            color={done ? "#fff" : colors.accent}
-          />
-        </View>
-
-        <Text className="text-lg font-bold" style={{ color: colors.text }}>
-          {done ? "Upload Complete!" : "Uploading Video…"}
-        </Text>
-
-        <View className="w-full h-2 rounded" style={{ backgroundColor: colors.surface }}>
-          <Animated.View
-            style={[
-              styles.fill,
-              {
-                backgroundColor: done ? colors.success : colors.accent,
-                width: anim.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] }),
-              },
-            ]}
-          />
-        </View>
-
-        <Text className="text-3xl font-extrabold" style={{ color: done ? colors.success : colors.accent }}>
-          {progress}%
-        </Text>
-
-        {!done && (
-          <Text className="text-xs" style={{ color: colors.secondaryText }}>
-            Keep the app open while uploading
+    <View className="absolute bottom-0 left-0 right-0 bg-neutral-950 border-t border-neutral-800 px-4 py-3">
+      <View className="flex-row items-center justify-between mb-2">
+        <View className="flex-row items-center gap-2">
+          <ActivityIndicator size="small" color="#ff0000" />
+          <Text className="text-white font-medium">
+            Uploading video...
           </Text>
-        )}
+        </View>
+
+        <Text className="text-white font-semibold">
+          {Math.round(progress)}%
+        </Text>
       </View>
+
+      <View className="h-2 bg-neutral-800 rounded-full overflow-hidden">
+        <View
+          className="h-full bg-red-600 rounded-full"
+          style={{
+            width: `${Math.min(progress, 100)}%`,
+          }}
+        />
+      </View>
+
+      {uploadedBytes && totalBytes && (
+        <View className="flex-row justify-between mt-2">
+          <Text className="text-xs text-neutral-400">
+            {formatBytes(uploadedBytes)}
+          </Text>
+
+          <Text className="text-xs text-neutral-400">
+            {formatBytes(totalBytes)}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 99,
-  },
-  card: {
-    borderRadius: 22,
-    padding: 28,
-    alignItems: "center",
-    gap: 14,
-  },
-  fill: { height: "100%", borderRadius: 4 },
-});

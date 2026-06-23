@@ -6,7 +6,6 @@ import { Field } from "../ui/Field";
 import { Section } from "../ui/Section";
 import { SelectMock } from "../ui/SelectMock";
 
-
 type Props = {
   control: any;
   errors: any;
@@ -17,6 +16,9 @@ type Props = {
   onReplaceVideo: () => void;
   colors: any;
   showVideoPreview?: boolean;
+  // Thumbnail now lives in its own upload step by default. Pass true if you
+  // want it inline here too (e.g. for a single-page non-stepped layout).
+  showThumbnail?: boolean;
 };
 
 export const DetailsTab = ({
@@ -24,6 +26,7 @@ export const DetailsTab = ({
   thumbnail, onThumbnailChange,
   video, onReplaceVideo,
   colors, showVideoPreview = true,
+  showThumbnail = true,
 }: Props) => (
   <>
     {showVideoPreview && video && (
@@ -77,9 +80,11 @@ export const DetailsTab = ({
       </Field>
     </Section>
 
-    <Section title="THUMBNAIL" colors={colors}>
-      <ThumbnailPicker thumbnail={thumbnail} onChange={onThumbnailChange} />
-    </Section>
+    {showThumbnail && (
+      <Section title="THUMBNAIL" colors={colors}>
+        <ThumbnailPicker thumbnail={thumbnail} onChange={onThumbnailChange} />
+      </Section>
+    )}
 
     <Section title="TAGS & CATEGORY" colors={colors}>
       <Field label="Tags" hint="Separate tags with commas" colors={colors}>

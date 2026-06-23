@@ -1,64 +1,79 @@
-// Upload redux slice.
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-import { createSlice } from "@reduxjs/toolkit";
-import type { UploadState } from "./upload.types";
+export type Visibility = "PUBLIC" | "PRIVATE" | "UNLISTED";
+
+export interface Chapter {
+  id: string;
+  title: string;
+  timestamp: string;
+}
+
+export interface UploadState {
+  videoUri: string | null;
+  thumbnailUri: string | null;
+  title: string;
+  description: string;
+  visibility: Visibility;
+  madeForKids: boolean;
+  chapters: Chapter[];
+}
 
 const initialState: UploadState = {
-  loading: false,
-  progress: 0,
-  status: "IDLE",
-  message: "",
-  currentVideoId: null,
-  uploadId: null,
-  error: null,
+  videoUri: null,
+  thumbnailUri: null,
+  title: "",
+  description: "",
+  visibility: "PUBLIC",
+  madeForKids: false,
+  chapters: [],
 };
 
 const uploadSlice = createSlice({
   name: "upload",
   initialState,
   reducers: {
-    // mark upload as started, clear previous error
-    startUpload: (state) => {
-      state.loading = true;
-      state.error = null;
+    setVideoUri: (state, action: PayloadAction<string | null>) => {
+      state.videoUri = action.payload;
     },
-    // update progress percentage
-    setProgress: (state, action) => {
-      state.progress = action.payload;
+    setThumbnailUri: (state, action: PayloadAction<string | null>) => {
+      state.thumbnailUri = action.payload;
     },
-    // update status + message
-    setStatus: (state, action) => {
-      state.status = action.payload.status;
-      state.message = action.payload.message;
+    setTitle: (state, action: PayloadAction<string>) => {
+      state.title = action.payload;
     },
-    // store uploaded video id
-    setVideoId: (state, action) => {
-      state.currentVideoId = action.payload;
+    setDescription: (state, action: PayloadAction<string>) => {
+      state.description = action.payload;
     },
-    // mark upload as completed
-    uploadSuccess: (state) => {
-      state.loading = false;
-      state.status = "COMPLETED";
-      state.progress = 100;
+    setVisibility: (state, action: PayloadAction<Visibility>) => {
+      state.visibility = action.payload;
     },
-    // mark upload as failed with error
-    uploadFailed: (state, action) => {
-      state.loading = false;
-      state.status = "FAILED";
-      state.error = action.payload;
+    setMadeForKids: (state, action: PayloadAction<boolean>) => {
+      state.madeForKids = action.payload;
     },
-    // reset to initial state
+    addChapter: (state, action: PayloadAction<Chapter>) => {
+      state.chapters.push(action.payload);
+    },
+    updateChapter: (state, action: PayloadAction<Chapter>) => {
+      const idx = state.chapters.findIndex((c) => c.id === action.payload.id);
+      if (idx !== -1) state.chapters[idx] = action.payload;
+    },
+    removeChapter: (state, action: PayloadAction<string>) => {
+      state.chapters = state.chapters.filter((c) => c.id !== action.payload);
+    },
     resetUpload: () => initialState,
   },
 });
 
 export const {
-  startUpload,
-  setProgress,
-  setStatus,
-  setVideoId,
-  uploadSuccess,
-  uploadFailed,
+  setVideoUri,
+  setThumbnailUri,
+  setTitle,
+  setDescription,
+  setVisibility,
+  setMadeForKids,
+  addChapter,
+  updateChapter,
+  removeChapter,
   resetUpload,
 } = uploadSlice.actions;
 

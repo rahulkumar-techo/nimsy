@@ -1,26 +1,28 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 type Props = {
   label: string;
-  hint?: string;
   error?: string;
-  children: React.ReactNode;
+  hint?: string;
   colors: any;
+  children: React.ReactNode;
 };
 
-export const Field = ({ label, hint, error, children, colors }: Props) => (
-  <View style={styles.field}>
-    <Text style={[styles.fieldLabel, { color: colors.primaryText }]}>{label}</Text>
-    {hint && <Text style={[styles.fieldHint, { color: colors.secondaryText }]}>{hint}</Text>}
-    {children}
-    {error && <Text style={styles.fieldError}>{error}</Text>}
-  </View>
-);
+export function Field({ label, error, hint, colors, children }: Props) {
+  return (
+    <View style={styles.wrap}>
+      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+      {hint && <Text style={[styles.hint, { color: colors.mutedText }]}>{hint}</Text>}
+      <View style={styles.inputWrap}>{children}</View>
+      {error && <Text style={[styles.error, { color: "#ff4444" }]}>{error}</Text>}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  field:      { marginBottom: 14 },
-  fieldLabel: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  fieldHint:  { fontSize: 12, marginBottom: 6, lineHeight: 17 },
-  fieldError: { fontSize: 12, color: "#DC2626", marginTop: 4 },
+  wrap: { marginBottom: 4 },
+  label: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
+  hint: { fontSize: 12, marginBottom: 6 },
+  inputWrap: {},
+  error: { fontSize: 12, marginTop: 4 },
 });

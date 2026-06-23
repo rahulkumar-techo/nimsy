@@ -16,6 +16,7 @@ export function useVideoUpload() {
       type: "video/*",
       copyToCacheDirectory: true,
     });
+    
     if (!result.canceled) {
       setVideo(result.assets[0]);
       setUploadProgress(null);

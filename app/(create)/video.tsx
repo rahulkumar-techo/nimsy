@@ -1,4 +1,4 @@
-import UploadVideo from "@/features/upload/screens/upload-video.screen";
+import UploadVideo from "@/features/upload/screens/upload.screen";
 
 export default function UploadRoute() {
   return <UploadVideo />;

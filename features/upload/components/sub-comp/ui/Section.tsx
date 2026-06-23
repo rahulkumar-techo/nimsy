@@ -1,29 +1,38 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-type Props = { title?: string; children: React.ReactNode; colors: any };
+type Props = {
+  title?: string;
+  colors: any;
+  children: React.ReactNode;
+};
 
-export const Section = ({ title, children, colors }: Props) => (
-  <View style={[styles.section, { backgroundColor: colors.background, borderColor: colors.border }]}>
-    {title && (
-      <Text style={[styles.sectionTitle, { color: colors.mutedText }]}>{title}</Text>
-    )}
-    {children}
-  </View>
-);
+export function Section({ title, colors, children }: Props) {
+  return (
+    <View style={[styles.wrap, { borderColor: colors.border }]}>
+      {title && <Text style={[styles.title, { color: colors.mutedText }]}>{title}</Text>}
+      <View style={[styles.content, { backgroundColor: colors.surface }]}>{children}</View>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  section: {
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
+  wrap: {
     borderWidth: StyleSheet.hairlineWidth,
-    gap: 4,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: 14,
   },
-  sectionTitle: {
+  title: {
     fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 0.7,
-    marginBottom: 10,
+    letterSpacing: 0.6,
+    marginBottom: 6,
+    paddingHorizontal: 14,
+    marginTop: 14,
+  },
+  content: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 12,
   },
 });
