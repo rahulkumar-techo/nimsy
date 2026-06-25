@@ -1,7 +1,6 @@
 import { useTheme } from "@/context/ThemeContext";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useRouter } from "expo-router";
-import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -10,30 +9,46 @@ import { SelectVideoStep } from "@/features/upload/components/steps/SelectVideoS
 import { ThumbnailStep } from "@/features/upload/components/steps/ThumbnailStep";
 import { UploadLoadingOverlay } from "@/features/upload/components/UploadLoadingOverlay";
 import UploadHeader from "@/features/upload/components/UploadHeader";
-import UploadProgress from "@/features/upload/components/UploadProgress";
 import { UploadStepFooter } from "@/features/upload/components/UploadStepFooter";
 import { UploadStepper } from "@/features/upload/components/UploadStepper";
 import { useUploadForm } from "@/features/upload/hooks/useUploadForm";
 import { useUploadSteps } from "@/features/upload/hooks/useUploadSteps";
-import { useImagePicker } from "../hooks/use-pickThumbnail";
+import { UploadStatus } from "@/features/upload/types/upload.types";
 
 export default function UploadVideoScreen() {
   const { colors } = useTheme();
-  const { video, uploadProgress, pickVideo } = useVideoUpload();
+  const { video, pickVideo } = useVideoUpload();
   const router = useRouter();
-  const [thumbnail, setThumbnail] = useState<string | null>(null);
 
   const { step, stepIndex, isFirst, isLast, goNext, goBack } = useUploadSteps();
-
   const {
-    loading, progress, message,
     form,
-    visibility, setVisibility,
-    chapters, addChapter, updateChapter, removeChapter,
+    visibility,
+    setVisibility,
     onSubmit,
+    status,
+    progress,
+    error,
+    pauseUpload,
+    cancelUpload,
   } = useUploadForm(video);
 
+  const loading = status === "UPLOADING" || status === "INITIATED";
+  const message =
+    status === "PAUSED"
+      ? "Paused"
+      : status === "FAILED"
+        ? "Failed"
+        : status === "COMPLETED"
+          ? "Completed"
+          : status === "CANCELLED"
+            ? "Cancelled"
+            : "Uploading...";
 
+  const inputStyle = [
+    styles.input,
+    { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
+  ];
 
   const {
     control,
@@ -41,13 +56,6 @@ export default function UploadVideoScreen() {
     trigger,
     formState: { errors, isSubmitting },
   } = form;
-
-  const inputStyle = [
-    styles.input,
-    { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
-  ];
-
-  // ── Step navigation ──────────────────────────────────────────────────────
 
   const isNextDisabled = step === "video" && !video;
 
@@ -59,7 +67,6 @@ export default function UploadVideoScreen() {
     }
 
     if (step === "details") {
-      // Only block on the required field — chapters/visibility/more stay optional.
       const valid = await trigger("title");
       if (!valid) return;
       goNext();
@@ -67,11 +74,14 @@ export default function UploadVideoScreen() {
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  const handleCancel = () => {
+    cancelUpload();
+    router.back();
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={["top", "bottom"]}>
-      <UploadHeader onClosePress={() => router.back()} />
+      <UploadHeader onClosePress={handleCancel} />
 
       <UploadStepper stepIndex={stepIndex} colors={colors} />
 
@@ -91,12 +101,12 @@ export default function UploadVideoScreen() {
                 inputStyle={inputStyle}
                 video={video}
                 onReplaceVideo={pickVideo}
-                chapters={chapters}
-                onAddChapter={addChapter}
-                onUpdateChapter={updateChapter}
-                onRemoveChapter={removeChapter}
-                visibility={visibility}
-                onSelectVisibility={setVisibility}
+                chapters={[]}
+                onAddChapter={() => {}}
+                onUpdateChapter={() => {}}
+                onRemoveChapter={() => {}}
+                visibility={visibility === "PUBLIC" ? "public" : visibility === "PRIVATE" ? "private" : "unlisted"}
+                onSelectVisibility={(v) => setVisibility(v === "public" ? "PUBLIC" : v === "private" ? "PRIVATE" : "UNLISTED")}
                 colors={colors}
               />
             )}
@@ -123,7 +133,6 @@ export default function UploadVideoScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {uploadProgress !== null && <UploadProgress progress={uploadProgress} />}
       {loading && <UploadLoadingOverlay progress={progress} message={message} />}
     </SafeAreaView>
   );
@@ -141,17 +150,3 @@ const styles = StyleSheet.create({
   },
   tos: { fontSize: 11, textAlign: "center", marginTop: 14, lineHeight: 17, paddingHorizontal: 16 },
 });
-
-/*
-<UploadHeader
-  title="Create Upload"
-  subtitle="Step 1: Select Video"
-/>
-
-<UploadProgress
-  currentStep={1}
-  totalSteps={2}
-  progress={50}
-/>
-
-*/ 

@@ -30,7 +30,6 @@ export function useImagePicker(
 
   const {
     allowsEditing = false,
-    allowsMultipleSelection= false,
     aspect = [16, 9],
     quality = 0.8,
   } = options;

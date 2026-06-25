@@ -4,22 +4,29 @@ import { useDispatch, useSelector } from "react-redux";
 import { useImagePicker } from "../hooks/use-pickThumbnail";
 import { AppDispatch, RootState } from "@/store/store";
 import { setThumbnailUri } from "../store/upload.slice";
-import { useTheme } from "@/context/ThemeContext";
 
-export default function ThumbnailPicker() {
+type Props = {
+  thumbnail?: string | null;
+  onChange?: (uri: string) => void;
+};
+
+export default function ThumbnailPicker({ thumbnail: thumbnailProp, onChange }: Props = {}) {
   const dispatch = useDispatch<AppDispatch>();
-  const thumbnail = useSelector((state: RootState) => state.upload.thumbnailUri);
+  const reduxThumbnail = useSelector((state: RootState) => state.upload.thumbnailUri);
+  const thumbnail = thumbnailProp ?? reduxThumbnail;
   const { loading, pickImage } = useImagePicker({ aspect: [16, 9] });
-  const { colors } = useTheme();
   const handleSelectThumbnail = async () => {
     const image = await pickImage();
-    if (image) dispatch(setThumbnailUri(image.uri));
+    if (image) {
+      dispatch(setThumbnailUri(image.uri));
+      onChange?.(image.uri);
+    }
   };
 
   return (
     <View className="gap-4">
 
-    
+     
       {/* Preview Container */}
       <TouchableOpacity
         activeOpacity={0.8}

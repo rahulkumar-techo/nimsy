@@ -1,87 +1,138 @@
-// Domain types for the upload feature (metadata, video selection, UI options).
+/**
+ * Upload Types
+ * Strict TypeScript interfaces for the upload system.
+ */
 
+// Upload lifecycle statuses
+export type UploadStatus =
+  | "IDLE"
+  | "INITIATED"
+  | "UPLOADING"
+  | "PAUSED"
+  | "COMPLETING"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED";
+
+// Visibility options matching backend
+export type Visibility = "PUBLIC" | "PRIVATE" | "UNLISTED";
+
+// Chapter metadata for video
 export interface Chapter {
   id: string;
-  time: string;
   title: string;
+  startTime: number;
 }
 
-export type VisibilityOption = "public" | "unlisted" | "private" | "scheduled";
-
-// A video selected from the native picker. `uri` is a native file path/content
-// URI — never a Blob/ArrayBuffer. The file is streamed natively from this path,
-// it is never read into JS memory.
-export interface SelectedVideo {
-  uri: string;
-  name: string;
-  mimeType?: string;
-  size?: number;
-}
-
-export interface SelectedThumbnail {
-  uri: string;
-  fileName: string;
-}
-
+// Metadata sent to backend during initialization
 export interface UploadMetadata {
+  title: string;
+  description?: string;
+  visibility: Visibility;
+  madeForKids: boolean;
+  chapters: Chapter[];
+  allowComments:boolean;
+  allowRating:boolean;
+}
+
+// Request payload for POST /upload/init
+export interface UploadInitRequest {
   title: string;
   description?: string;
   fileName: string;
   mimeType: string;
   fileSize: number;
-  chapters: Chapter[];
+  visibility: Visibility;
   madeForKids: boolean;
-  allowComments: boolean;
-  allowRatings: boolean;
+  allowRatings:boolean;
+  allowComments:boolean;
+  chapters: Chapter[];
 }
 
-export interface UploadPart {
+// Part of a presigned URL from backend
+export interface PresignedPart {
   partNumber: number;
   url: string;
 }
 
-export interface InitUploadResponse {
+// Response from POST /upload/init
+export interface UploadInitResponse {
   videoId: string;
-  uploadSessionId: string;
   uploadId: string;
-  objectKey: string;
   chunkSize: number;
-  totalChunks: number;
-  urls: UploadPart[];
-  thumbnailKey: string;
-  previewKey: string | null;
-  thumbnailUploadUrl: string | null;
+  totalParts: number;
+  urls: PresignedPart[];
 }
 
+// Uploaded part tracking ETag
 export interface UploadedPart {
   partNumber: number;
   etag: string;
 }
 
-export interface CompleteUploadPayload {
+// Response from GET /videos/:videoId/upload/status
+export interface UploadStatusResponse {
+  uploadedParts: UploadedPart[];
+  status: "INITIATED" | "UPLOADING" | "COMPLETED" | "FAILED";
+}
+
+// Complete upload request body
+export interface CompleteUploadRequest {
+  videoId: string;
+  uploadedParts: UploadedPart[];
+}
+
+// Per-chunk status for granular tracking
+export type ChunkStatus = "PENDING" | "UPLOADING" | "DONE" | "FAILED" | "RETRYING";
+
+// Chunk metadata with retry tracking
+export interface ChunkMeta {
+  partNumber: number;
+  status: ChunkStatus;
+  etag?: string;
+  retryCount: number;
+  lastError?: string;
+}
+
+// Persisted upload session stored in MMKV
+export interface UploadSession {
   videoId: string;
   uploadId: string;
-  parts: UploadedPart[];
+  fileUri: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  chunkSize: number;
+  totalParts: number;
+  uploadedParts: UploadedPart[];
+  presignedUrls: PresignedPart[];
+  metadata: UploadMetadata;
+  status: UploadStatus;
+  createdAt: number;
+  updatedAt: number;
 }
 
-export interface ServerUploadStatusResponse {
-  status: string;
-  progress: number;
-  uploadedChunks: number;
-  totalChunks: number;
-  remainingChunks: number;
-  isCompleted: boolean;
+// Parameters to start a new upload
+export interface StartUploadParams {
+  fileUri: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  metadata: UploadMetadata;
 }
 
-export type UploadPhase =
-  | "IDLE"
-  | "INITIALIZING"
-  | "CHUNKING"
-  | "UPLOADING"
-  | "COMPLETING"
-  | "PROCESSING"
-  | "COMPLETED"
-  | "FAILED"
-  | "CANCELLED";
+// Callbacks for upload events
+export interface UploadCallbacks {
+  onProgress?: (progress: number) => void;
+  onStatusChange?: (status: UploadStatus) => void;
+  onError?: (error: Error) => void;
+  onChunkProgress?: (partNumber: number, progress: number) => void;
+}
 
-export type UploadProgressCallback = (progress: number, phase: UploadPhase, message: string) => void;
+// Progress state for UI
+export interface UploadProgressState {
+  uploadedBytes: number;
+  totalBytes: number;
+  uploadedParts: number;
+  totalParts: number;
+}

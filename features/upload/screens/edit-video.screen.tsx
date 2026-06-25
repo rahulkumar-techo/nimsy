@@ -1,10 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 export default function EditVideoScreen() {
-  const [saving, setSaving] = useState(false);
-
   return (
     <View style={styles.safe}>
       <View style={styles.center}>

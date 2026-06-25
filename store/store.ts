@@ -3,15 +3,13 @@
  */
 
 import { configureStore } from "@reduxjs/toolkit";
-
 import feedReducer from "@/features/home/store/feed.slice";
-import uploadReducer from "@/features/upload/store/upload.slice";
-import uploadApiReducer from "@/features/upload/store/uploadApi.slice";
+import uploadReducer, { uploadProgressReducer } from "@/features/upload/store/upload.slice";
 
 export const store = configureStore({
   reducer: {
     upload: uploadReducer,
-    uploadApi: uploadApiReducer,
+    uploadUI: uploadProgressReducer,
     feed: feedReducer,
   },
 });

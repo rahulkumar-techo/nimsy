@@ -1,82 +1,86 @@
-/**
- * Axios Instance  (lib/api.ts)
- *
- * FIX: On refresh token failure, the interceptor now calls the AuthContext
- * logout so React state is cleared in sync with storage — previously it
- * called authStorage.clear() directly, leaving user set in context while
- * storage was empty, causing a null-snap on next mount.
- */
-
+import { AUTH_ENDPOINTS } from "@/constants/auth.constants";
 import { authStorage } from "@/features/auth/utils/auth-storage";
-import axios, {
-    AxiosInstance,
-    InternalAxiosRequestConfig,
-    create
-} from "axios";
+import axios, { AxiosInstance, InternalAxiosRequestConfig, create } from "axios";
 
-const API_BASE_URL = "http://10.189.245.170:5000/api/v1";
+const API_BASE_URL = "http://10.161.161.170:5000/api/v1";
 
 const axiosInstance: AxiosInstance = create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
-// ─── Request: attach access token ─────────────────────────────────────────────
+// ─── Request Interceptor ──────────────────────────────────────────────────────
 
 axiosInstance.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // DEBUG: Inspect config before appending the access token
+    debugger; 
     const token = await authStorage.getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    // DEBUG: Triggered if there's an error configuration before sending the request
+    debugger; 
+    return Promise.reject(error);
+  }
 );
 
-// ─── Token refresh ────────────────────────────────────────────────────────────
+// ─── Token Refresh Queue Utilities ────────────────────────────────────────────
 
 let isRefreshing = false;
-let failedQueue: {
-  resolve: (token: string) => void;
-  reject: (err: unknown) => void;
-}[] = [];
+let failedQueue: { resolve: (token: string) => void; reject: (err: unknown) => void }[] = [];
 
 function processQueue(error: unknown, token: string | null) {
+  // DEBUG: Inspect the queue length and the incoming error/token resolving it
+  debugger; 
   failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token!)));
   failedQueue = [];
 }
 
-// Called by the interceptor — we import lazily to avoid circular deps
-// between api.ts → AuthContext → api.ts
 async function handleTokenRefresh(): Promise<string> {
   const storedRefresh = await authStorage.getRefreshToken();
-  if (!storedRefresh) throw new Error("No refresh token available");
+  if (!storedRefresh) {
+    // DEBUG: Hit if refresh token is missing in storage during a 401 retry
+    debugger; 
+    throw new Error("No refresh token available");
+  }
 
-  const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+  // DEBUG: Paused right before making the refresh API network call
+  debugger; 
+  const response = await axios.post(`${API_BASE_URL}${AUTH_ENDPOINTS.REFRESH_TOKEN}`, {
     refreshToken: storedRefresh,
   });
+  console.log(response);
 
   const { accessToken, refreshToken: newRefreshToken } = response.data.data;
   await authStorage.saveTokens(accessToken, newRefreshToken);
   return accessToken;
 }
 
-// ─── Response: handle 401 with token queue ────────────────────────────────────
+// ─── Response Interceptor ─────────────────────────────────────────────────────
 
 axiosInstance.interceptors.response.use(
   (response) => response,
-
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    // DEBUG: Inspect any error that hits the interceptor (401, 403, 500, etc.)
+    debugger; 
+
+    if (error.response?.status !== 401 || originalRequest?._retry) {
+      // DEBUG: Request failed, but it's either NOT a 401 or it's a 401 that already retried
+      debugger; 
       return Promise.reject(error);
     }
 
-    // If a refresh is already in-flight, queue this request
     if (isRefreshing) {
+      // DEBUG: Another request is already refreshing tokens; queueing this request
+      debugger; 
       return new Promise<string>((resolve, reject) => {
         failedQueue.push({ resolve, reject });
       })
@@ -84,25 +88,31 @@ axiosInstance.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${token}`;
           return axiosInstance(originalRequest);
         })
-        .catch((err) => Promise.reject(err));
+        .catch((err) => {
+          // DEBUG: Queued request failed after the refresh token attempt failed
+          debugger; 
+          return Promise.reject(err);
+        });
     }
 
     originalRequest._retry = true;
     isRefreshing = true;
 
     try {
+      // DEBUG: This request is initiating the token refresh process
+      debugger; 
       const newToken = await handleTokenRefresh();
       processQueue(null, newToken);
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
+      
+      // DEBUG: Retrying the original request with the brand new token
+      debugger; 
       return axiosInstance(originalRequest);
     } catch (refreshError) {
+      // DEBUG: Token refresh failed completely (e.g., refresh token expired)
+      debugger; 
       processQueue(refreshError, null);
-
-      // Clear storage — AuthContext will detect missing session on next mount.
-      // To also clear React state immediately, import and call logout() here
-      // if you wire it up via a setter (see note below).
       await authStorage.clear();
-
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
@@ -111,18 +121,3 @@ axiosInstance.interceptors.response.use(
 );
 
 export default axiosInstance;
-
-/**
- * NOTE — wiring logout to the interceptor without circular imports:
- *
- * In your App entry or AuthProvider, do this once:
- *
- *   import { setLogoutHandler } from "@/lib/api";
- *   // inside AuthProvider:
- *   useEffect(() => { setLogoutHandler(logout); }, [logout]);
- *
- * Then add to api.ts:
- *   let _logout: (() => void) | null = null;
- *   export const setLogoutHandler = (fn: () => void) => { _logout = fn; };
- *   // in catch: _logout?.();
- */

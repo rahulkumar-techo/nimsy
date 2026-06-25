@@ -12,7 +12,7 @@ export function ThumbnailStep({ colors }: Props) {
     <View style={styles.wrap}>
       <Section title="THUMBNAIL" colors={colors}>
         <Text style={[styles.hint, { color: colors.secondaryText }]}>
-          Pick a thumbnail that stands out and gives viewers a clear idea of what's in your video.
+          Pick a thumbnail that stands out and gives viewers a clear idea of what&apos;s in your video.
         </Text>
         <ThumbnailPicker />
       </Section>

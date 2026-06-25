@@ -1,14 +1,18 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+/**
+ * Upload Slice
+ * Redux state for form data and upload progress tracking.
+ */
 
-export type Visibility = "PUBLIC" | "PRIVATE" | "UNLISTED";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { UploadedPart, UploadStatus, Visibility } from "../types/upload.types";
 
 export interface Chapter {
   id: string;
   title: string;
-  timestamp: string;
+  startTime: number;
 }
 
-export interface UploadState {
+export interface UploadFormState {
   videoUri: string | null;
   thumbnailUri: string | null;
   title: string;
@@ -18,7 +22,7 @@ export interface UploadState {
   chapters: Chapter[];
 }
 
-const initialState: UploadState = {
+const initialFormState: UploadFormState = {
   videoUri: null,
   thumbnailUri: null,
   title: "",
@@ -28,9 +32,28 @@ const initialState: UploadState = {
   chapters: [],
 };
 
-const uploadSlice = createSlice({
+export interface UploadProgressState {
+  progress: number;
+  status: UploadStatus;
+  error: string | null;
+  isUploading: boolean;
+  currentVideoId: string | null;
+  uploadedParts: UploadedPart[];
+}
+
+const initialProgressState: UploadProgressState = {
+  progress: 0,
+  status: "IDLE",
+  error: null,
+  isUploading: false,
+  currentVideoId: null,
+  uploadedParts: [],
+};
+
+// Form slice for upload metadata
+const uploadFormSlice = createSlice({
   name: "upload",
-  initialState,
+  initialState: initialFormState,
   reducers: {
     setVideoUri: (state, action: PayloadAction<string | null>) => {
       state.videoUri = action.payload;
@@ -60,7 +83,32 @@ const uploadSlice = createSlice({
     removeChapter: (state, action: PayloadAction<string>) => {
       state.chapters = state.chapters.filter((c) => c.id !== action.payload);
     },
-    resetUpload: () => initialState,
+    resetUpload: () => initialFormState,
+  },
+});
+
+// Progress slice for upload UI state
+const uploadProgressSlice = createSlice({
+  name: "uploadUI",
+  initialState: initialProgressState,
+  reducers: {
+    setProgress: (state, action: PayloadAction<number>) => {
+      state.progress = action.payload;
+    },
+    setStatus: (state, action: PayloadAction<UploadStatus>) => {
+      state.status = action.payload;
+      state.isUploading = action.payload === "UPLOADING" || action.payload === "INITIATED";
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+    },
+    setVideoId: (state, action: PayloadAction<string | null>) => {
+      state.currentVideoId = action.payload;
+    },
+    setUploadedParts: (state, action: PayloadAction<UploadedPart[]>) => {
+      state.uploadedParts = action.payload;
+    },
+    resetUploadProgress: () => initialProgressState,
   },
 });
 
@@ -75,6 +123,16 @@ export const {
   updateChapter,
   removeChapter,
   resetUpload,
-} = uploadSlice.actions;
+} = uploadFormSlice.actions;
 
-export default uploadSlice.reducer;
+export const {
+  setProgress,
+  setStatus,
+  setError,
+  setVideoId,
+  setUploadedParts,
+  resetUploadProgress,
+} = uploadProgressSlice.actions;
+
+export default uploadFormSlice.reducer;
+export const uploadProgressReducer = uploadProgressSlice.reducer;

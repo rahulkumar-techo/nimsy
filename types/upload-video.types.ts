@@ -19,6 +19,13 @@ export type VideoAsset = {
   mimeType?: string;
 };
 
+export interface SelectedVideo {
+  uri: string;
+  name: string;
+  mimeType?: string;
+  size?: number;
+}
+
 export interface VideoFormData {
   title: string;
   description?: string;

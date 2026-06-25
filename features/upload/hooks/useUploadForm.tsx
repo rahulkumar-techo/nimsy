@@ -1,31 +1,18 @@
-import { z } from "zod";
 import { useState, useCallback } from "react";
 import { Alert } from "react-native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useDispatch, useSelector } from "react-redux";
-
-import { Chapter, SelectedVideo, UploadPhase, VisibilityOption } from "../types/upload.types";
 import { uploadSchema } from "../validators/upload.schema";
-import { uploadVideoThunk } from "../store/upload.thunk";
-import { setUploadProgress, setUploadMessage } from "../store/uploadApi.slice";
-import { startUploadPolling } from "../utils/upload-polling.util";
-import type { AppDispatch, RootState } from "@/store/store";
+import { useUpload } from "./useUpload";
+import { z } from "zod";
+import type { Visibility } from "../types/upload.types";
+import type { SelectedVideo } from "@/types/upload-video.types";
 
 export type FormData = z.infer<typeof uploadSchema>;
 
 export function useUploadForm(video: SelectedVideo | null) {
-  const dispatch = useDispatch<AppDispatch>();
-  const [visibility, setVisibility] =
-    useState<VisibilityOption>("public");
-
-  const [chapters, setChapters] = useState<Chapter[]>([
-    { id: "1", time: "0:00", title: "Intro" },
-  ]);
-
-  const loading = useSelector((state: RootState) => state.uploadApi.isUploading);
-  const progress = useSelector((state: RootState) => state.uploadApi.uploadProgress);
-  const message = useSelector((state: RootState) => state.uploadApi.uploadMessage);
+  const [visibility, setVisibility] = useState<Visibility>("PUBLIC");
+  const { startUpload, ...uploadState } = useUpload();
 
   const form = useForm<FormData>({
     resolver: zodResolver(uploadSchema),
@@ -39,105 +26,42 @@ export function useUploadForm(video: SelectedVideo | null) {
     },
   });
 
-  const addChapter = useCallback(() =>
-    setChapters((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        time: "0:00",
-        title: "",
-      },
-    ]),
-  []);
-
-  const updateChapter = useCallback(
-    (id: string, field: "time" | "title", value: string) =>
-      setChapters((prev) =>
-        prev.map((chapter) =>
-          chapter.id === id
-            ? { ...chapter, [field]: value }
-            : chapter
-        )
-      ),
-    []
-  );
-
-  const removeChapter = useCallback(
-    (id: string) =>
-      setChapters((prev) =>
-        prev.filter((chapter) => chapter.id !== id)
-      ),
-    []
-  );
-
   const onSubmit = useCallback(async (data: FormData) => {
     if (!video) {
-      Alert.alert(
-        "No Video",
-        "Please select a video."
-      );
+      Alert.alert("No Video", "Please select a video.");
       return;
     }
 
     try {
-      const result = await dispatch(
-        uploadVideoThunk({
-          video,
-          metadata: {
-            title: data.title,
-            description: data.description,
-            fileName: video.name,
-            mimeType: video.mimeType ?? "",
-            fileSize: video.size ?? 0,
-            chapters,
-            madeForKids: data.madeForKids,
-            allowComments: data.allowComments,
-            allowRatings: data.allowRatings,
-          },
-          onProgress: ((p: number, _phase: UploadPhase, msg: string) => {
-            dispatch(setUploadProgress(p));
-            dispatch(setUploadMessage(msg));
-          }),
-        })
-      ).unwrap();
-
-      startUploadPolling(result.videoId, (status) => {
-        if ("status" in status) {
-          dispatch(setUploadMessage(status.status));
-          if (status.isCompleted) {
-            dispatch(setUploadProgress(100));
-            Alert.alert(
-              "Success",
-              "Video processing completed."
-            );
-          }
-        }
+      await startUpload({
+        fileUri: video.uri,
+        fileName: video.name ?? "video",
+        mimeType: video.mimeType ?? "video/mp4",
+        fileSize: video.size ?? 0,
+        metadata: {
+          title: data.title,
+          description: data.description,
+          visibility,
+          madeForKids: data.madeForKids,
+          chapters:[],
+          allowComments: data.allowComments,
+          allowRating: data.allowRatings
+        },
       });
-    } catch (error) {
+      Alert.alert("Upload Started", "Your upload has started.");
+    } catch (err) {
       Alert.alert(
         "Upload Failed",
-        error instanceof Error
-          ? error.message
-          : "Something went wrong."
+        err instanceof Error ? err.message : "Unknown error",
       );
     }
-  }, [dispatch, video, chapters]);
+  }, [video, visibility, startUpload]);
 
   return {
     form,
-
     visibility,
     setVisibility,
-
-    chapters,
-    addChapter,
-    updateChapter,
-    removeChapter,
-
-    progress,
-    message,
-    loading,
-
     onSubmit,
+    ...uploadState,
   };
 }

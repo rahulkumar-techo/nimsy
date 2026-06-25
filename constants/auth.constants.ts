@@ -6,7 +6,7 @@ export const AUTH_ENDPOINTS = {
   LOGIN: "/auth/login",
   REGISTER: "/auth/register",
   LOGOUT: "/auth/logout",
-  REFRESH_TOKEN: "/auth/refresh-token",
+  REFRESH_TOKEN: "/auth/refresh",
   FORGOT_PASSWORD: "/auth/forgot-password",
   VERIFY_OTP: "/auth/verify-email-otp",
   RESEND_OTP: "/auth/resend-email-otp",
