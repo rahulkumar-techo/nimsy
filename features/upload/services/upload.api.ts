@@ -27,6 +27,7 @@ export const uploadApi = {
    * Finalizes the multipart upload on the backend.
    */
   async complete(payload: CompleteUploadRequest): Promise<void> {
+    console.log(JSON.stringify(payload,null,5))
     const{data}= await axiosInstance.post("/videos/upload/complete", payload);
     return data.data;
   },

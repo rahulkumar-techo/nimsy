@@ -92,7 +92,9 @@
       "expo-secure-store",
       "expo-font",
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      // for background upload and download support 
+      "@kesha-antonov/react-native-background-downloader"
     ],
     "experiments": {
       "typedRoutes": true,

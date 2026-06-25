@@ -60,7 +60,7 @@ export interface UploadInitResponse {
   videoId: string;
   uploadId: string;
   chunkSize: number;
-  totalParts: number;
+  totalChunks: number;
   urls: PresignedPart[];
 }
 
@@ -79,7 +79,8 @@ export interface UploadStatusResponse {
 // Complete upload request body
 export interface CompleteUploadRequest {
   videoId: string;
-  uploadedParts: UploadedPart[];
+  uploadId:string;
+  parts: UploadedPart[];
 }
 
 // Per-chunk status for granular tracking

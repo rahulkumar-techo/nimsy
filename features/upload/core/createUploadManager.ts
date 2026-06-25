@@ -4,6 +4,7 @@
  * Manages concurrent chunk uploads with retry, pause, resume, and cancel support.
  */
 
+import { UploadWorker } from "../service/upload.worker";
 import { uploadApi } from "../services/upload.api";
 import * as uploadStorage from "../storage/upload.storage";
 import {
@@ -15,7 +16,7 @@ import {
   UploadCallbacks,
 } from "../types/upload.types";
 import { createChunkFile, deleteChunkFile } from "../utils/chunk";
-import { uploadChunkInBackground } from "../service/background-upload.service";
+
 
 const CONCURRENCY = 3;
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000] as const;
@@ -173,21 +174,58 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     try {
       chunkPath = await createChunkFile(
         session.fileUri,
+        session.uploadId,
         task.part.partNumber,
         task.startByte,
         task.endByte,
       );
       console.log(`[UploadManager] Temporary chunk file created at: ${chunkPath}`);
 
-      return await uploadChunkInBackground({
-        filePath: chunkPath,
-        url: task.part.url,
-        signal: controller.signal,
-        onProgress: (progress) => {
-          console.log(`[UploadManager] Part #${task.part.partNumber} Progress: ${(progress * 100).toFixed(1)}%`);
-          callbacks?.onChunkProgress?.(task.part.partNumber, progress);
-        },
-      });
+      // return await uploadChunkInBackground({
+      //   filePath: chunkPath,
+      //   url: task.part.url,
+      //   signal: controller.signal,
+      //   onProgress: (progress) => {
+      //     console.log(`[UploadManager] Part #${task.part.partNumber} Progress: ${(progress * 100).toFixed(1)}%`);
+      //     callbacks?.onChunkProgress?.(task.part.partNumber, progress);
+      //   },
+      // });
+
+      const worker = new UploadWorker(
+        [
+          {
+            partNumber: task.part.partNumber,
+            fileUri: chunkPath,
+            url: task.part.url,
+            startByte: task.startByte,
+            endByte: task.endByte,
+          },
+        ],
+        {
+          onProgress: (part, progress) => {
+            callbacks?.onChunkProgress?.(
+              part,
+              progress
+            );
+          },
+
+          onCompleted: (part, etag) => {
+            console.log(
+              `Part ${part} uploaded. ETag=${etag}`
+            );
+          },
+
+          onError: (part, error) => {
+            console.error(
+              `Part ${part} failed`,
+              error
+            );
+          },
+        }
+      );
+
+      const [etag] = await worker.run();
+      return etag
     } finally {
       activeUploads.delete(task.part.partNumber);
       if (chunkPath) {
@@ -212,7 +250,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     session = {
       ...session,
       uploadedParts: [...session.uploadedParts, { partNumber, etag }],
-    };
+    };  
     persist();
     callbacks?.onProgress?.(calculateProgress());
   }
@@ -291,6 +329,12 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       updateStatus("CANCELLED");
     } else if (paused) {
       updateStatus("PAUSED");
+    } else if (session && session.uploadedParts.length >= session.totalParts) {
+      await completeUpload();
+    } else if (session) {
+      // Workers stopped (e.g. a non-retryable failure already set status FAILED
+      // and returned from worker()) without completing — nothing further to do here.
+      console.warn("[UploadManager] Queue drained without reaching FAILED/PAUSED/CANCELLED, and not all parts uploaded.");
     }
   }
 
@@ -306,11 +350,13 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
     try {
       const sortedParts = [...session.uploadedParts].sort((a, b) => a.partNumber - b.partNumber);
+
       console.log("[UploadManager] Dispatching payload to uploadApi.complete with sorted parts structure:", JSON.stringify(sortedParts));
 
       await uploadApi.complete({
+        uploadId: session.uploadId,
         videoId: session.videoId,
-        uploadedParts: sortedParts,
+        parts: sortedParts,
       });
 
       console.log("[UploadManager] Backend accepted merge. Clearing persistent store allocations.");
@@ -362,7 +408,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       mimeType: params.mimeType,
       fileSize: params.fileSize,
       chunkSize: initResponse.chunkSize,
-      totalParts: initResponse.totalParts,
+      totalParts: initResponse.totalChunks,
       presignedUrls: initResponse.urls, // Ensure your schema normalizes target fields perfectly
       uploadedParts: [],
       metadata: params.metadata,
