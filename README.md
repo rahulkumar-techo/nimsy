@@ -183,3 +183,13 @@ There are currently a few non-blocking warnings in `components/home-comp/Feature
 ## License
 
 This project is private unless you choose to publish it under a separate license.
+
+```
+refactor this to use YouTube's deterministic, race-free architecture. The key changes:
+1. Single source of truth: partProgress Map stores exact state per part
+2.No dual mutable variables: Eliminate completedUploadedBytes + activeChunkBytes race
+3. Deterministic progress: Recalculate from scratch every time, never accumulate
+4. Part-centric completion: A part only counts when fully done (or its exact in-flight bytes)
+5. Clean state machine: Each part is PENDING → UPLOADING → COMPLETED, never ambiguous
+
+```

@@ -32,6 +32,8 @@ export function useUpload() {
       activeParts: update.activeParts,
       completedParts: update.completedParts,
       totalParts: update.totalParts,
+       completedBytes:update.completedBytes,
+      inFlightBytes:update.inFlightBytes,
     }));
   }, [dispatch]);
 

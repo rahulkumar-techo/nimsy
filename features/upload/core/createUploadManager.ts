@@ -1,7 +1,12 @@
 /**
- * Upload Manager Factory
- * Creates an isolated upload manager with no singleton architecture.
- * Manages concurrent chunk uploads with retry, pause, resume, and cancel support.
+ * Upload Manager Factory — YouTube-Style Deterministic Progress
+ * 
+ * Architecture:
+ * - Single source of truth: partState Map tracks every part's exact status
+ * - Progress is recalculated from scratch every time (no accumulators)
+ * - YOUTUBE-STYLE: Only COMPLETED parts count toward progress
+ *   In-flight bytes are shown separately (activeParts count) but don't affect %
+ * - 100% only appears when ALL parts are verified and completeUpload() succeeds
  */
 
 import { UploadWorker } from "../service/upload.worker";
@@ -27,15 +32,11 @@ type TaskQueue = Array<{
   endByte: number;
 }>;
 
-type ActiveUpload = {
-  controller: AbortController;
-  partNumber: number;
-};
+type PartState =
+  | { status: "PENDING"; size: number }
+  | { status: "UPLOADING"; uploadedBytes: number; size: number }
+  | { status: "COMPLETED"; etag: string; size: number };
 
-/**
- * Checks if an error is retryable based on type or HTTP status.
- * Does not retry on 4xx client errors.
- */
 function isRetryableError(error: unknown): boolean {
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
@@ -64,16 +65,10 @@ function isRetryableError(error: unknown): boolean {
   return false;
 }
 
-/**
- * Exponential backoff sleep utility.
- */
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Retries an operation with exponential backoff.
- */
 async function retry<T>(operation: () => Promise<T>, attempt: number = 0): Promise<T> {
   try {
     return await operation();
@@ -89,21 +84,25 @@ async function retry<T>(operation: () => Promise<T>, attempt: number = 0): Promi
 
 /**
  * Creates an isolated upload manager instance.
- * Each call returns a fresh manager with its own state.
+ * 
+ * PROGRESS MODEL (YouTube-Style):
+ * - Progress % = (completedParts / totalParts) × 100
+ * - Only fully verified chunks count. No in-flight bytes affect the percentage.
+ * - The bar "jumps" forward when each chunk finishes — this is intentional.
+ * - 100% only appears after completeUpload() succeeds.
+ * - In-flight activity is shown via activeParts count, not the percentage.
  */
 export function createUploadManager(callbacks?: UploadCallbacks) {
   let session: UploadSession | null = null;
   let paused = false;
   let cancelled = false;
-  const activeUploads = new Map<number, ActiveUpload>();
+  const activeWorkers = new Map<number, UploadWorker>();
   let cursor: number;
   let taskQueue: TaskQueue | null = null;
 
-  const activeChunkBytes = new Map<number, number>();
+  /** Single source of truth for all part states */
+  const partState = new Map<number, PartState>();
 
-  /**
-   * Persists session state with updated timestamp.
-   */
   function persist(): void {
     if (session) {
       session = { ...session, updatedAt: Date.now() };
@@ -111,40 +110,129 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     }
   }
 
-  /**
-   * Updates upload status and notifies callbacks.
-   */
   function updateStatus(status: UploadStatus): void {
     callbacks?.onStatusChange?.(status);
   }
 
   /**
-   * Calculates global progress percentage from uploaded parts.
+   * YOUTUBE-STYLE PROGRESS CALCULATION
+   * 
+   * ONLY completed parts count toward the percentage.
+   * In-flight bytes are tracked for diagnostics but do NOT affect progress.
+   * 
+   * This guarantees:
+   * - Progress never decreases
+   * - 100% only appears when truly done
+   * - No rounding artifacts from in-flight bytes
    */
-  function calculateProgress(): number {
-    if (!session) return 0;
-    const fraction = session.uploadedParts.length / session.totalParts;
-    return Math.min(100, Math.max(0, fraction * 100));
+  function calculateProgress(): {
+    progress: number;
+    uploadedBytes: number;
+    completedBytes: number;
+    inFlightBytes: number;
+  } {
+    if (!session) {
+      return { progress: 0, uploadedBytes: 0, completedBytes: 0, inFlightBytes: 0 };
+    }
+
+    let completedBytes = 0;
+    let inFlightBytes = 0;
+
+    for (const state of partState.values()) {
+      if (state.status === "COMPLETED") {
+        completedBytes += state.size;
+      } else if (state.status === "UPLOADING") {
+        inFlightBytes += state.uploadedBytes;
+      }
+    }
+
+    const totalUploadedBytes = completedBytes + inFlightBytes;
+
+    // YOUTUBE-STYLE: progress based ONLY on completed parts
+    const progress = (completedBytes / session.fileSize) * 100;
+
+    return {
+      progress: Math.min(progress, 99.99), // NEVER show 100% until completeUpload()
+      uploadedBytes: Math.min(totalUploadedBytes, session.fileSize),
+      completedBytes,
+      inFlightBytes,
+    };
   }
 
-  /**
-   * Emits a full progress update to the consumer.
-   */
-  function emitProgress(uploadedBytes: number): void {
+  /** Monotonic guard — progress never decreases */
+  let highestProgressEmitted = 0;
+
+  function emitProgress(force = false): void {
     if (!session) return;
+
+    const { progress, uploadedBytes, completedBytes, inFlightBytes } = calculateProgress();
+
+    const clampedProgress = Math.max(progress, highestProgressEmitted);
+
+    if (!force && clampedProgress === highestProgressEmitted) {
+      return; // No change, skip emit
+    }
+
+    highestProgressEmitted = clampedProgress;
+
     callbacks?.onProgress?.({
-      progress: calculateProgress(),
-      uploadedBytes: Math.min(uploadedBytes, session.fileSize),
+      progress: clampedProgress,
+      uploadedBytes,
       totalBytes: session.fileSize,
-      activeParts: activeUploads.size,
+      activeParts: activeWorkers.size,
       completedParts: session.uploadedParts.length,
       totalParts: session.totalParts,
+      // Optional: expose these for UI to show "X MB uploading now"
+      completedBytes,
+      inFlightBytes,
     });
   }
 
-  /**
-   * Gets parts not yet uploaded based on server state.
-   */
+  function initializePartState(totalParts: number, fileSize: number, chunkSize: number): void {
+    partState.clear();
+
+    for (let i = 1; i <= totalParts; i++) {
+      const isLastPart = i === totalParts;
+      const size = isLastPart
+        ? fileSize - chunkSize * (totalParts - 1)
+        : chunkSize;
+
+      partState.set(i, { status: "PENDING", size });
+    }
+  }
+
+  function setPartUploading(partNumber: number, uploadedBytes: number): void {
+    const state = partState.get(partNumber);
+    if (!state || state.status === "COMPLETED") return;
+
+    partState.set(partNumber, {
+      status: "UPLOADING",
+      uploadedBytes: Math.min(uploadedBytes, state.size),
+      size: state.size,
+    });
+  }
+
+  function setPartCompleted(partNumber: number, etag: string): void {
+    const state = partState.get(partNumber);
+    if (!state) return;
+
+    partState.set(partNumber, {
+      status: "COMPLETED",
+      etag,
+      size: state.size,
+    });
+  }
+
+  function setPartPending(partNumber: number): void {
+    const state = partState.get(partNumber);
+    if (!state) return;
+
+    partState.set(partNumber, {
+      status: "PENDING",
+      size: state.size,
+    });
+  }
+
   function getRemainingParts(
     allParts: PresignedPart[],
     uploaded: UploadedPart[],
@@ -168,10 +256,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     return result;
   }
 
-  /**
-   * Fetches fresh presigned URLs for the given part numbers.
-   * Used on resume, since originally-issued URLs may have expired.
-   */
   async function reSignParts(partNumbers: number[]): Promise<PresignedPart[]> {
     if (!session || partNumbers.length === 0) return [];
 
@@ -184,12 +268,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     return response.parts.map((p) => ({ partNumber: p.partNumber, url: p.presignedUrl }));
   }
 
-  /**
-   * Reports a successfully uploaded chunk to the backend so server-side
-   * state stays in sync, independent of local storage. Fire-and-forget:
-   * local state is already authoritative for resuming this session, so a
-   * failure here shouldn't block the upload loop -- just log it.
-   */
   function reportChunkUploaded(partNumber: number, etag: string): void {
     if (!session) return;
     uploadApi
@@ -197,57 +275,61 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       .catch((err) => console.error(`[UploadManager] Failed to report part ${partNumber} as uploaded`, err));
   }
 
-  /**
-   * Uploads a single chunk to S3 using presigned URL.
-   * Uses native file slicing and background upload to avoid memory bloat.
-   */
   async function uploadChunk(task: TaskQueue[number]): Promise<string> {
     if (!session) throw new Error("Session lost during upload");
 
-    const p = task.part.partNumber;
+    const partNumber = task.part.partNumber;
     let chunkPath: string | null = null;
-    activeUploads.set(p, { controller: new AbortController(), partNumber: p });
+    let resolvedEtag: string | null = null;
 
     try {
-      chunkPath = await createChunkFile(session.fileUri, session.uploadId, p, task.startByte, task.endByte);
-
-      let resolvedEtag: string | null = null;
+      chunkPath = await createChunkFile(
+        session.fileUri,
+        session.uploadId,
+        partNumber,
+        task.startByte,
+        task.endByte
+      );
 
       const worker = new UploadWorker(
-        [{ partNumber: p, fileUri: chunkPath, url: task.part.url, startByte: task.startByte, endByte: task.endByte }],
+        [{
+          partNumber,
+          fileUri: chunkPath,
+          url: task.part.url,
+          startByte: task.startByte,
+          endByte: task.endByte,
+        }],
         {
-          onChunkProgress: ({ partNumber, uploadedBytes }) => {
-            activeChunkBytes.set(partNumber, uploadedBytes);
-            if (!session) return;
-
-            const activeBytes = Array.from(activeChunkBytes.values()).reduce((sum, bytes) => sum + bytes, 0);
-            const totalUploadedBytes = (session.uploadedParts.length * session.chunkSize) + activeBytes;
-
-            emitProgress(totalUploadedBytes);
+          onChunkProgress: ({ uploadedBytes }) => {
+            setPartUploading(partNumber, uploadedBytes);
+            // NOTE: We do NOT emit progress on chunk progress anymore.
+            // The % only changes when a part completes. In-flight bytes
+            // are silently tracked for diagnostics only.
           },
           onChunkComplete: (partNumber, etag) => {
-            activeChunkBytes.delete(partNumber);
             resolvedEtag = etag;
           },
           onChunkError: (partNumber, error) => {
-            activeChunkBytes.delete(partNumber);
+            setPartPending(partNumber);
             console.error(`[UploadManager] Part ${partNumber} failed`, error);
           },
         }
       );
 
+      activeWorkers.set(partNumber, worker);
       await worker.run();
 
       if (!resolvedEtag) {
-        throw new Error(`Upload completed without an etag for part ${p}`);
+        throw new Error(`Upload completed without ETag for part ${partNumber}`);
       }
 
       return resolvedEtag;
+
     } finally {
-      activeUploads.delete(p);
+      activeWorkers.delete(partNumber);
       if (chunkPath) {
         await deleteChunkFile(chunkPath).catch((err) =>
-          console.error("[UploadManager] File deletion failed", err)
+          console.error("[UploadManager] Failed to delete chunk file", err)
         );
       }
     }
@@ -256,22 +338,24 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   function handleUploadSuccess(partNumber: number, etag: string): void {
     if (!session || cancelled) return;
 
-    if (session.uploadedParts.some((p) => p.partNumber === partNumber)) return;
+    if (session.uploadedParts.some((p) => p.partNumber === partNumber)) {
+      return;
+    }
 
-    activeChunkBytes.delete(partNumber);
-    session = { ...session, uploadedParts: [...session.uploadedParts, { partNumber, etag }] };
+    setPartCompleted(partNumber, etag);
+
+    session = {
+      ...session,
+      uploadedParts: [...session.uploadedParts, { partNumber, etag }],
+    };
+
     persist();
-
     reportChunkUploaded(partNumber, etag);
-
-    const activeBytes = Array.from(activeChunkBytes.values()).reduce((sum, bytes) => sum + bytes, 0);
-    const uploadedBytes = (session.uploadedParts.length * session.chunkSize) + activeBytes;
-    emitProgress(uploadedBytes);
+    emitProgress(true); // Emit on completion — this is when the bar jumps
   }
 
   function handleUploadFailure(error: unknown): void {
     if (error instanceof Error && error.name === "AbortError") {
-      // Intentional abort from pause/cancel; not a real failure.
       return;
     }
 
@@ -304,14 +388,11 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
         handleUploadSuccess(task.part.partNumber, etag);
       } catch (error) {
         handleUploadFailure(error);
-        return; // Terminal error ends this execution thread
+        return;
       }
     }
   }
 
-  /**
-   * Processes the upload queue with CONCURRENCY workers.
-   */
   async function processQueue(): Promise<void> {
     if (!session) {
       console.error("[UploadManager] Cannot process queue: Session payload is completely null.");
@@ -331,7 +412,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     updateStatus("UPLOADING");
     UploadNotificationService.showProgress(0);
 
-    // Each worker runs independently and competes for tasks from the shared queue.
     await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
     if (cancelled) {
@@ -345,9 +425,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     }
   }
 
-  /**
-   * Finalizes the multipart upload on the backend.
-   */
   async function completeUpload(): Promise<void> {
     if (!session) return;
 
@@ -368,6 +445,18 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       persist();
       uploadStorage.removeSession();
       updateStatus("COMPLETED");
+
+      // NOW we emit 100% — only after backend confirms success
+      highestProgressEmitted = 100;
+      callbacks?.onProgress?.({
+        progress: 100,
+        uploadedBytes: session.fileSize,
+        totalBytes: session.fileSize,
+        activeParts: 0,
+        completedParts: session.totalParts,
+        totalParts: session.totalParts,
+      });
+
       UploadNotificationService.showCompleted();
     } catch (error) {
       console.error("[UploadManager] API exception while completing multipart upload:", error);
@@ -378,9 +467,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     }
   }
 
-  /**
-   * Starts a new upload session.
-   */
   async function start(params: StartUploadParams): Promise<void> {
     clearStaleSession();
     if (uploadStorage.hasSession()) {
@@ -390,6 +476,11 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
     paused = false;
     cancelled = false;
+    partState.clear();
+    activeWorkers.clear();
+    taskQueue = null;
+    cursor = 0;
+    highestProgressEmitted = 0;
 
     updateStatus("INITIALIZING");
 
@@ -413,8 +504,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       fileSize: params.fileSize,
       chunkSize: initResponse.chunkSize,
       totalParts: initResponse.totalChunks,
-      // default keep 0
-      highestProgressReached: 0,
       presignedUrls: initResponse.urls,
       uploadedParts: [],
       metadata: params.metadata,
@@ -423,31 +512,32 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       updatedAt: Date.now(),
     };
 
+    initializePartState(initResponse.totalChunks, params.fileSize, initResponse.chunkSize);
+
     persist();
     updateStatus("INITIATED");
     await processQueue();
   }
 
-  /**
-   * Resumes an interrupted upload.
-   * Fetches server state to avoid duplicate uploads, then re-signs
-   * URLs for any remaining parts since the originals may have expired.
-   */
   async function resume(): Promise<void> {
     const stored = uploadStorage.getSession();
+
     if (!stored) {
-      console.error("[UploadManager] Action blocked: Local instance cache metadata layer lookup yielded null.");
+      console.error("[UploadManager] Action blocked: Local session not found.");
       throw new Error("No upload session found");
     }
 
     session = stored;
-    paused = false;
-    cancelled = false;
+
+    partState.clear();
+    activeWorkers.clear();
+    taskQueue = null;
+    cursor = 0;
+    highestProgressEmitted = 0;
+
     updateStatus("INITIALIZING");
 
     const serverState = await uploadApi.getStatus(session.videoId);
-
-
 
     if (serverState.status === "COMPLETED") {
       uploadStorage.removeSession();
@@ -455,85 +545,77 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       return;
     }
 
-    session = { ...session, uploadedParts: serverState.uploadedParts };
-
-    // Recalculate progress after syncing with backend
-    const uploadedBytes = Math.min(
-      session.uploadedParts.length * session.chunkSize,
-      session.fileSize,
-    );
-
-// deleteChunkFile
-    const realProgress =
-      (uploadedBytes / session.fileSize) * 100;
-
     session = {
       ...session,
-      highestProgressReached: Math.max(
-        session.highestProgressReached ?? 0,
-        realProgress,
-      ),
+      uploadedParts: mergeUploadedParts(session.uploadedParts, serverState.uploadedParts),
     };
 
-    callbacks?.onProgress?.({
-      progress: session.highestProgressReached,
-      uploadedBytes,
-      totalBytes: session.fileSize,
+    initializePartState(session.totalParts, session.fileSize, session.chunkSize);
 
-      activeParts: activeChunkBytes.size,
+    for (const uploaded of session.uploadedParts) {
+      setPartCompleted(uploaded.partNumber, uploaded.etag);
+    }
 
-      completedParts:
-        session.uploadedParts.length,
-
-      totalParts:
-        session.totalParts,
-    });
-
+    emitProgress(true);
 
     const remainingPartNumbers = session.presignedUrls
-      .map((p) => p.partNumber)
-      .filter((partNumber) => !session!.uploadedParts.some((u) => u.partNumber === partNumber));
+      .map((part) => part.partNumber)
+      .filter(
+        (partNumber) =>
+          !session!.uploadedParts.some((uploaded) => uploaded.partNumber === partNumber)
+      );
 
     try {
-      const freshParts = await reSignParts(remainingPartNumbers);
-      if (freshParts.length > 0) {
-        const freshByPart = new Map(freshParts.map((p) => [p.partNumber, p]));
-        session = {
-          ...session,
-          presignedUrls: session.presignedUrls.map((p) => freshByPart.get(p.partNumber) ?? p),
-        };
+      if (remainingPartNumbers.length > 0) {
+        const freshParts = await reSignParts(remainingPartNumbers);
+
+        if (freshParts.length > 0) {
+          const freshByPart = new Map(freshParts.map((part) => [part.partNumber, part]));
+
+          session = {
+            ...session,
+            presignedUrls: session.presignedUrls.map(
+              (part) => freshByPart.get(part.partNumber) ?? part
+            ),
+          };
+        }
       }
     } catch (error) {
-      // Non-fatal: fall back to the existing URLs. They may still be valid,
-      // and individual chunk failures will surface through the normal retry path.
-      console.error("[UploadManager] Failed to re-sign remaining parts on resume", error);
+      console.error("[UploadManager] Failed to refresh presigned URLs during resume", error);
     }
 
     persist();
     await processQueue();
   }
 
-  /**
-   * Pauses the upload. Aborts all active workers.
-   */
   function pause(): void {
-    if (!session || session.status !== "UPLOADING") {
-      return;
-    }
+    if (!session || session.status !== "UPLOADING") return;
+
     paused = true;
-    activeUploads.forEach((upload) => upload.controller.abort());
-    activeUploads.clear();
+
+    activeWorkers.forEach((worker) => worker.cancel());
+    activeWorkers.clear();
+
+    for (const [partNumber, state] of partState.entries()) {
+      if (state.status === "UPLOADING") {
+        setPartPending(partNumber);
+      }
+    }
+
+    session = { ...session, status: "PAUSED" };
+    persist();
     updateStatus("PAUSED");
   }
 
-  /**
-   * Cancels the upload. Cleans up session and active uploads.
-   */
   function cancel(): void {
     cancelled = true;
     paused = false;
-    activeUploads.forEach((upload) => upload.controller.abort());
-    activeUploads.clear();
+
+    activeWorkers.forEach((worker) => worker.cancel());
+    activeWorkers.clear();
+    partState.clear();
+    taskQueue = null;
+    cursor = 0;
 
     if (session) {
       uploadStorage.removeSession();
@@ -547,17 +629,18 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     const historicalSession = uploadStorage.getSession();
     if (!historicalSession) return;
 
-    const terminalStates = [
-      "INITIATED",
-      "FAILED",
-      "COMPLETED",
-      "CANCELLED",
-      "UPLOADING",
-    ];
+    const removableStates = ["FAILED", "COMPLETED", "CANCELLED"];
 
-    if (terminalStates.includes(historicalSession.status)) {
+    if (removableStates.includes(historicalSession.status)) {
       uploadStorage.removeSession();
     }
+  }
+
+  function mergeUploadedParts(local: UploadedPart[], server: UploadedPart[]): UploadedPart[] {
+    const merged = new Map<number, UploadedPart>();
+    for (const p of local) merged.set(p.partNumber, p);
+    for (const p of server) merged.set(p.partNumber, p);
+    return Array.from(merged.values());
   }
 
   return {

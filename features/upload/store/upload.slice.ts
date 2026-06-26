@@ -44,6 +44,8 @@ export interface UploadProgressState {
   isUploading: boolean;
   currentVideoId: string | null;
   uploadedParts: UploadedPart[];
+  completedBytes?: number,
+  inFlightBytes?: number,
 }
 
 const initialProgressState: UploadProgressState = {
@@ -105,13 +107,19 @@ const uploadProgressSlice = createSlice({
     setProgress: (state, action: PayloadAction<number>) => {
       state.progress = action.payload;
     },
-    setProgressDetail: (state, action: PayloadAction<{ uploadedBytes: number; totalBytes: number; activeParts: number; completedParts: number; totalParts: number }>) => {
+    setProgressDetail: (state, action: PayloadAction<{
+      uploadedBytes: number; totalBytes: number; activeParts: number; completedParts: number; totalParts: number, completedBytes?: number,
+      inFlightBytes?: number
+    }>) => {
       state.uploadedBytes = action.payload.uploadedBytes;
       state.totalBytes = action.payload.totalBytes;
       state.activeParts = action.payload.activeParts;
       state.completedParts = action.payload.completedParts;
       state.totalParts = action.payload.totalParts;
       state.progress = (action.payload.uploadedBytes / action.payload.totalBytes) * 100;
+      // additional
+      state.completedBytes = action.payload?.completedBytes;
+      state.inFlightBytes = action.payload?.inFlightBytes;
     },
     setStatus: (state, action: PayloadAction<UploadStatus>) => {
       state.status = action.payload;

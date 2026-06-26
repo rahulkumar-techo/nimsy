@@ -105,7 +105,6 @@ export interface UploadSession {
   fileName: string;
   mimeType: string;
   key: string;
-  highestProgressReached: number;
   fileSize: number;
   chunkSize: number;
   totalParts: number;
@@ -153,6 +152,8 @@ export interface ProgressUpdate {
   activeParts: number; // number of parts currently uploading
   completedParts: number; // number of parts fully uploaded
   totalParts: number; // total parts for this upload
+  completedBytes?:number;
+  inFlightBytes?:number;
 }
 
 // Progress state for UI
