@@ -5,7 +5,7 @@
  * Location: src/components/profile/ProfileHorizontalCard.tsx
  */
 
-import React, { useState } from "react";
+// import React, { useState } from "react";
 
 import {
   View,
@@ -15,9 +15,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 
-import { X, EllipsisVertical } from "lucide-react-native";
+import { X } from "lucide-react-native";
 
-import VideoActionsSheet from "./VideoActionsSheet";
+// import VideoActionsSheet from "./VideoActionsSheet";
 import { useTheme } from "@/context/ThemeContext";
 
 export type UploadStage =
@@ -62,11 +62,11 @@ export default function ProfileHorizontalCard({
   views = "0 views",
   uploadDate = "Just now",
 
-  error,
+  // error,
 
   onCancel,
 }: ProfileHorizontalCardProps) {
-  const [showMenu, setShowMenu] = useState(false);
+  // const [showMenu, setShowMenu] = useState(false);
 
   const { colors } = useTheme()
 
@@ -75,16 +75,16 @@ export default function ProfileHorizontalCard({
     stage === "UPLOADING" ||
     stage === "PROCESSING";
 
-  const status =
-    stage === "PREPARING"
-      ? "Preparing upload"
-      : stage === "UPLOADING"
-        ? `${Math.round(progress)}% uploaded`
-        : stage === "PROCESSING"
-          ? "Processing video"
-          : stage === "FAILED"
-            ? error || "Upload failed"
-            : "";
+  // const status =
+  //   stage === "PREPARING"
+  //     ? "Preparing upload"
+  //     : stage === "UPLOADING"
+  //       ? `${Math.round(progress)}% uploaded`
+  //       : stage === "PROCESSING"
+  //         ? "Processing video"
+  //         : stage === "FAILED"
+  //           ? error || "Upload failed"
+  //           : "";
 
   return (
     <>

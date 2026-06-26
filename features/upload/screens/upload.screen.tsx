@@ -7,15 +7,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MetadataStep } from "@/features/upload/components/steps/MetadataStep";
 import { SelectVideoStep } from "@/features/upload/components/steps/SelectVideoStep";
 import { ThumbnailStep } from "@/features/upload/components/steps/ThumbnailStep";
-import { UploadLoadingOverlay } from "@/features/upload/components/UploadLoadingOverlay";
 import UploadHeader from "@/features/upload/components/UploadHeader";
 import { UploadStepFooter } from "@/features/upload/components/UploadStepFooter";
 import { UploadStepper } from "@/features/upload/components/UploadStepper";
 import { useUploadForm } from "@/features/upload/hooks/useUploadForm";
 import { useUploadSteps } from "@/features/upload/hooks/useUploadSteps";
-import { UploadStatus } from "@/features/upload/types/upload.types";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store/store";
+// import { useSelector } from "react-redux";
+// import { RootState } from "@/store/store";
 import UploadProgressScreen from "../components/UploadProgress";
 
 export default function UploadVideoScreen() {
@@ -30,23 +28,23 @@ export default function UploadVideoScreen() {
     setVisibility,
     onSubmit,
     status,
-    progress,
-    error,
-    pauseUpload,
+    // progress,
+    // error,
+    // pauseUpload,
     cancelUpload,
   } = useUploadForm(video);
 
-  const loading = status === "UPLOADING" || status === "INITIATED"||status==="INITIALIZING";
-  const message =
-    status === "PAUSED"
-      ? "Paused"
-      : status === "FAILED"
-        ? "Failed"
-        : status === "COMPLETED"
-          ? "Completed"
-          : status === "CANCELLED"
-            ? "Cancelled"
-            : "Uploading...";
+  const loading = status === "UPLOADING" || status === "INITIATED" || status === "INITIALIZING";
+  // const message =
+  //   status === "PAUSED"
+  //     ? "Paused"
+  //     : status === "FAILED"
+  //       ? "Failed"
+  //       : status === "COMPLETED"
+  //         ? "Completed"
+  //         : status === "CANCELLED"
+  //           ? "Cancelled"
+  //           : "Uploading...";
 
   const inputStyle = [
     styles.input,
@@ -82,8 +80,8 @@ export default function UploadVideoScreen() {
     router.back();
   };
 
-  const ProgressStatus = useSelector((state: RootState) => state.uploadUI.status);
-const showUpload = status !== "IDLE" && status !== "CANCELLED";
+  // const ProgressStatus = useSelector((state: RootState) => state.uploadUI.status);
+  // const showUpload = status !== "IDLE" && status !== "CANCELLED";
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={["top", "bottom"]}>
@@ -108,9 +106,9 @@ const showUpload = status !== "IDLE" && status !== "CANCELLED";
                 video={video}
                 onReplaceVideo={pickVideo}
                 chapters={[]}
-                onAddChapter={() => {}}
-                onUpdateChapter={() => {}}
-                onRemoveChapter={() => {}}
+                onAddChapter={() => { }}
+                onUpdateChapter={() => { }}
+                onRemoveChapter={() => { }}
                 visibility={visibility === "PUBLIC" ? "public" : visibility === "PRIVATE" ? "private" : "unlisted"}
                 onSelectVisibility={(v) => setVisibility(v === "public" ? "PUBLIC" : v === "private" ? "PRIVATE" : "UNLISTED")}
                 colors={colors}
@@ -139,7 +137,7 @@ const showUpload = status !== "IDLE" && status !== "CANCELLED";
         </View>
       </KeyboardAvoidingView>
 
-    {loading && <UploadProgressScreen />}
+      {isSubmitting && <UploadProgressScreen />}
     </SafeAreaView>
   );
 }

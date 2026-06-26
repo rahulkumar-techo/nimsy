@@ -26,9 +26,22 @@ export function useUploadForm(video: SelectedVideo | null) {
     },
   });
 
-  useEffect(()=>{
-    form
-  },[uploadState.status==="COMPLETED"])
+useEffect(() => {
+  console.log(uploadState.status)
+  // temp fix:
+  if (uploadState.status === "COMPLETED"||uploadState.status === "COMPLETING") {
+    form.reset({
+      title: "",
+      description: "",
+      tags: "",
+      madeForKids: false,
+      allowComments: true,
+      allowRatings: true,
+    });
+
+    // setVisibility("PUBLIC");
+  }
+}, [uploadState.status, form]);
 
   const onSubmit = useCallback(async (data: FormData) => {
     if (!video) {

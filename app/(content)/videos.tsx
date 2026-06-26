@@ -5,17 +5,16 @@
  * Location: src/screens/VideosScreen.tsx (or app/(tabs)/videos.tsx, per your routing)
  */
 
-import React from "react";
 
 import { FlatList, View } from "react-native";
 
 import ProfileHeader from "@/components/profile/ProfileHeader";
-import ProfileHorizontalCard from "@/components/profile/ProfileHorizontalCard";
+import ProfileHorizontalCard,{UploadStage} from "@/components/profile/ProfileHorizontalCard";
 import PublishedVideoCard from "@/components/profile/Publishedvideocard ";
 
 import { useTheme } from "@/context/ThemeContext";
 
-import { UploadStage } from "@/components/profile/ProfileHorizontalCard";
+
 
 type VideoListItem =
   | {

@@ -63,6 +63,18 @@ export const uploadApi = {
     return data.data;
   },
 
+  async cancleUpload(payload: {
+    videoId: string,
+    objectKey: string,
+    uploadId: string,
+  }): Promise<{
+    videoId: string;
+    status: string;
+  }> {
+    const { data } = await axiosInstance.post(`/videos/upload/cancel`, payload);
+    return data.data;
+  }
+
 
 
 };

@@ -2,7 +2,7 @@
  * Content layout with sticky chips navigation
  */
 
-import React from "react";
+
 
 import {
   View,

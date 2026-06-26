@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import { Text, View } from 'react-native'
+
 
 const Audios = () => {
   return (
@@ -11,4 +11,3 @@ const Audios = () => {
 
 export default Audios
 
-const styles = StyleSheet.create({})

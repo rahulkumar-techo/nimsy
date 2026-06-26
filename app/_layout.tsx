@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 import { useEffect } from "react";
-import axiosInstance from "@/lib/api";
+// import axiosInstance from "@/lib/api";
 import { UploadNotificationService } from "@/features/upload/service/notification.service";
 
 function RootNavigator() {

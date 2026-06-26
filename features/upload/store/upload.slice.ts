@@ -60,6 +60,8 @@ const initialProgressState: UploadProgressState = {
   isUploading: false,
   currentVideoId: null,
   uploadedParts: [],
+  completedBytes:0,
+  inFlightBytes:0
 };
 
 // Form slice for upload metadata
