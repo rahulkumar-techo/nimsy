@@ -9,15 +9,19 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 import { useEffect } from "react";
 import axiosInstance from "@/lib/api";
+import { UploadNotificationService } from "@/features/upload/service/notification.service";
 
 function RootNavigator() {
   const { theme, colors } = useTheme();
+
+  useEffect(() => {
+    UploadNotificationService.initialize();
+  }, []);
 
   return (
     <>
       <StatusBar
         style={theme === "light" ? "dark" : "light"}
-      // backgroundColor={colors.background}
       />
 
       <Stack

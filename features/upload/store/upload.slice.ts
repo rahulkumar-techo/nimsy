@@ -34,6 +34,11 @@ const initialFormState: UploadFormState = {
 
 export interface UploadProgressState {
   progress: number;
+  uploadedBytes: number;
+  totalBytes: number;
+  activeParts: number;
+  completedParts: number;
+  totalParts: number;
   status: UploadStatus;
   error: string | null;
   isUploading: boolean;
@@ -43,6 +48,11 @@ export interface UploadProgressState {
 
 const initialProgressState: UploadProgressState = {
   progress: 0,
+  uploadedBytes: 0,
+  totalBytes: 0,
+  activeParts: 0,
+  completedParts: 0,
+  totalParts: 0,
   status: "IDLE",
   error: null,
   isUploading: false,
@@ -95,9 +105,21 @@ const uploadProgressSlice = createSlice({
     setProgress: (state, action: PayloadAction<number>) => {
       state.progress = action.payload;
     },
+    setProgressDetail: (state, action: PayloadAction<{ uploadedBytes: number; totalBytes: number; activeParts: number; completedParts: number; totalParts: number }>) => {
+      state.uploadedBytes = action.payload.uploadedBytes;
+      state.totalBytes = action.payload.totalBytes;
+      state.activeParts = action.payload.activeParts;
+      state.completedParts = action.payload.completedParts;
+      state.totalParts = action.payload.totalParts;
+      state.progress = (action.payload.uploadedBytes / action.payload.totalBytes) * 100;
+    },
     setStatus: (state, action: PayloadAction<UploadStatus>) => {
       state.status = action.payload;
-      state.isUploading = action.payload === "UPLOADING" || action.payload === "INITIATED";
+      state.isUploading =
+        action.payload === "INITIALIZING" ||
+        action.payload === "INITIATED" ||
+        action.payload === "UPLOADING" ||
+        action.payload === "COMPLETING";
     },
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
@@ -127,6 +149,7 @@ export const {
 
 export const {
   setProgress,
+  setProgressDetail,
   setStatus,
   setError,
   setVideoId,

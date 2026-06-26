@@ -6,6 +6,7 @@
 // Upload lifecycle statuses
 export type UploadStatus =
   | "IDLE"
+  | "INITIALIZING"
   | "INITIATED"
   | "UPLOADING"
   | "PAUSED"
@@ -31,8 +32,8 @@ export interface UploadMetadata {
   visibility: Visibility;
   madeForKids: boolean;
   chapters: Chapter[];
-  allowComments:boolean;
-  allowRating:boolean;
+  allowComments: boolean;
+  allowRating: boolean;
 }
 
 // Request payload for POST /upload/init
@@ -44,8 +45,8 @@ export interface UploadInitRequest {
   fileSize: number;
   visibility: Visibility;
   madeForKids: boolean;
-  allowRatings:boolean;
-  allowComments:boolean;
+  allowRatings: boolean;
+  allowComments: boolean;
   chapters: Chapter[];
 }
 
@@ -59,6 +60,7 @@ export interface PresignedPart {
 export interface UploadInitResponse {
   videoId: string;
   uploadId: string;
+  objectKey: string;
   chunkSize: number;
   totalChunks: number;
   urls: PresignedPart[];
@@ -79,7 +81,7 @@ export interface UploadStatusResponse {
 // Complete upload request body
 export interface CompleteUploadRequest {
   videoId: string;
-  uploadId:string;
+  uploadId: string;
   parts: UploadedPart[];
 }
 
@@ -102,6 +104,8 @@ export interface UploadSession {
   fileUri: string;
   fileName: string;
   mimeType: string;
+  key: string;
+  highestProgressReached: number;
   fileSize: number;
   chunkSize: number;
   totalParts: number;
@@ -124,10 +128,31 @@ export interface StartUploadParams {
 
 // Callbacks for upload events
 export interface UploadCallbacks {
-  onProgress?: (progress: number) => void;
+  /**
+   * Global upload progress with byte precision.
+   * Called frequently for smooth progress animation.
+   */
+  onProgress?: (progress: ProgressUpdate) => void;
+
+  /**
+   * Upload status changes.
+   */
   onStatusChange?: (status: UploadStatus) => void;
+
+  /**
+   * Fatal upload error.
+   */
   onError?: (error: Error) => void;
-  onChunkProgress?: (partNumber: number, progress: number) => void;
+}
+
+// Progress update with byte precision for smooth UI animation
+export interface ProgressUpdate {
+  progress: number; // 0-100 percentage
+  uploadedBytes: number; // cumulative uploaded bytes for this session
+  totalBytes: number; // total file size
+  activeParts: number; // number of parts currently uploading
+  completedParts: number; // number of parts fully uploaded
+  totalParts: number; // total parts for this upload
 }
 
 // Progress state for UI
@@ -137,3 +162,22 @@ export interface UploadProgressState {
   uploadedParts: number;
   totalParts: number;
 }
+
+
+// -------------------------------
+
+
+export interface SingleChunkUploadBody {
+  uploadId: string;
+  key: string;
+  partNumbers: number[]
+}
+
+export interface SignPartsResponse {
+  uploadId: string;
+  parts: {
+    partNumber: number;
+    presignedUrl: string;
+  }[];
+}
+

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Alert } from "react-native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,10 @@ export function useUploadForm(video: SelectedVideo | null) {
       allowRatings: true,
     },
   });
+
+  useEffect(()=>{
+    form
+  },[uploadState.status==="COMPLETED"])
 
   const onSubmit = useCallback(async (data: FormData) => {
     if (!video) {
@@ -56,7 +60,6 @@ export function useUploadForm(video: SelectedVideo | null) {
       );
     }
   }, [video, visibility, startUpload]);
-
   return {
     form,
     visibility,

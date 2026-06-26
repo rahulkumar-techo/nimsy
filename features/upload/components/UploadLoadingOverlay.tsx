@@ -1,34 +1,60 @@
-import { UploadProgressCircle } from "@/components/UploadProgressCircle";
-import { StyleSheet, Text, View } from "react-native";
+// UploadLoadingOverlay.tsx
+import React, { useEffect, useRef, useState } from "react";
+import { View, Animated } from "react-native";
+import UploadProgress from "./UploadProgress";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 
-type Props = {
-  progress: number;
-  message: string;
-};
+export function UploadLoadingOverlay() {
+  const status = useSelector((state: RootState) => state.uploadUI.status);
+  const fade = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.9)).current;
+  const [mounted, setMounted] = useState(false);
 
-// Was previously rendered *inside* a <Text> as a <View> in the upload
-// button — invalid in React Native and would never display correctly.
-// Rendered here as a proper full-screen sibling overlay instead.
-export function UploadLoadingOverlay({ progress, message }: Props) {
+  const shouldShow = status !== "IDLE" && status !== "CANCELLED";
+
+  useEffect(() => {
+    if (shouldShow) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 8, tension: 80 }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(fade, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 0.9, duration: 180, useNativeDriver: true }),
+      ]).start(() => setMounted(false));
+    }
+  }, [shouldShow]);
+
+  // Auto-dismiss a short while after success/failure instead of staying open forever
+  useEffect(() => {
+    if (status === "COMPLETED" || status === "FAILED") {
+      const timeout = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(fade, { toValue: 0, duration: 180, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 0.9, duration: 180, useNativeDriver: true }),
+        ]).start(() => setMounted(false));
+      }, 1600);
+      return () => clearTimeout(timeout);
+    }
+  }, [status]);
+
+  if (!mounted) return null;
+
   return (
-    <View style={styles.overlay} pointerEvents="auto">
-      <UploadProgressCircle progress={progress} />
-      <Text style={styles.message}>{message}</Text>
-    </View>
+    <Animated.View
+      pointerEvents="auto"
+      style={{ opacity: fade }}
+      className="absolute inset-0 z-50 items-center justify-center bg-black/70"
+    >
+      <Animated.View
+        style={{ opacity: fade, transform: [{ scale }] }}
+        className="items-center justify-center rounded-3xl px-8 py-9"
+      >
+        <UploadProgress />
+      </Animated.View>
+    </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.85)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 50,
-  },
-  message: { color: "#fff", marginTop: 20, fontSize: 16 },
-});

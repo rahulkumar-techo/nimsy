@@ -46,8 +46,8 @@ export function UploadProgressCircle({
       </Svg>
 
       <View className="absolute items-center">
-        <Text className="text-xl font-bold">
-          {progress}%
+        <Text className="text-xl font-bold text-white">
+          {Math.floor(progress)}%
         </Text>
         <Text className="text-xs text-gray-500">
           Uploading

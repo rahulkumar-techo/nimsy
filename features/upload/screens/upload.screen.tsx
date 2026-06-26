@@ -14,6 +14,9 @@ import { UploadStepper } from "@/features/upload/components/UploadStepper";
 import { useUploadForm } from "@/features/upload/hooks/useUploadForm";
 import { useUploadSteps } from "@/features/upload/hooks/useUploadSteps";
 import { UploadStatus } from "@/features/upload/types/upload.types";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
+import UploadProgressScreen from "../components/UploadProgress";
 
 export default function UploadVideoScreen() {
   const { colors } = useTheme();
@@ -33,7 +36,7 @@ export default function UploadVideoScreen() {
     cancelUpload,
   } = useUploadForm(video);
 
-  const loading = status === "UPLOADING" || status === "INITIATED";
+  const loading = status === "UPLOADING" || status === "INITIATED"||status==="INITIALIZING";
   const message =
     status === "PAUSED"
       ? "Paused"
@@ -78,6 +81,9 @@ export default function UploadVideoScreen() {
     cancelUpload();
     router.back();
   };
+
+  const ProgressStatus = useSelector((state: RootState) => state.uploadUI.status);
+const showUpload = status !== "IDLE" && status !== "CANCELLED";
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={["top", "bottom"]}>
@@ -133,7 +139,7 @@ export default function UploadVideoScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {loading && <UploadLoadingOverlay progress={progress} message={message} />}
+    {loading && <UploadProgressScreen />}
     </SafeAreaView>
   );
 }

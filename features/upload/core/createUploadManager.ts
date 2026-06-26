@@ -16,7 +16,7 @@ import {
   UploadCallbacks,
 } from "../types/upload.types";
 import { createChunkFile, deleteChunkFile } from "../utils/chunk";
-
+import { UploadNotificationService } from "../service/notification.service";
 
 const CONCURRENCY = 3;
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000] as const;
@@ -78,12 +78,10 @@ async function retry<T>(operation: () => Promise<T>, attempt: number = 0): Promi
   try {
     return await operation();
   } catch (error) {
-    console.warn(`[UploadManager] Retry attempt ${attempt} failed. Error:`, error);
     if (attempt >= BACKOFF_MS.length || !isRetryableError(error)) {
       throw error;
     }
     const delay = BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
-    console.log(`[UploadManager] Backing off for ${delay}ms...`);
     await sleep(delay);
     return retry(operation, attempt + 1);
   }
@@ -101,13 +99,14 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   let cursor: number;
   let taskQueue: TaskQueue | null = null;
 
+  const activeChunkBytes = new Map<number, number>();
+
   /**
    * Persists session state with updated timestamp.
    */
   function persist(): void {
     if (session) {
       session = { ...session, updatedAt: Date.now() };
-      console.log(`[UploadManager] Persisting session. Status: ${session.status}, Uploaded parts: ${session.uploadedParts.length}/${session.totalParts}`);
       uploadStorage.saveSession(session);
     }
   }
@@ -116,18 +115,31 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
    * Updates upload status and notifies callbacks.
    */
   function updateStatus(status: UploadStatus): void {
-    console.log(`[UploadManager] Status changed to -> ${status}`);
     callbacks?.onStatusChange?.(status);
   }
 
   /**
-   * Calculates global progress from uploaded parts.
+   * Calculates global progress percentage from uploaded parts.
    */
   function calculateProgress(): number {
     if (!session) return 0;
-    const progress = session.uploadedParts.length / session.totalParts;
-    console.log(`[UploadManager] Global Progress Calculated: ${(progress * 100).toFixed(2)}%`);
-    return progress;
+    const fraction = session.uploadedParts.length / session.totalParts;
+    return Math.min(100, Math.max(0, fraction * 100));
+  }
+
+  /**
+   * Emits a full progress update to the consumer.
+   */
+  function emitProgress(uploadedBytes: number): void {
+    if (!session) return;
+    callbacks?.onProgress?.({
+      progress: calculateProgress(),
+      uploadedBytes: Math.min(uploadedBytes, session.fileSize),
+      totalBytes: session.fileSize,
+      activeParts: activeUploads.size,
+      completedParts: session.uploadedParts.length,
+      totalParts: session.totalParts,
+    });
   }
 
   /**
@@ -137,8 +149,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     allParts: PresignedPart[],
     uploaded: UploadedPart[],
   ): TaskQueue {
-    console.log(`[UploadManager] Evaluating remaining parts. Total from config: ${allParts?.length}, Already uploaded: ${uploaded?.length}`);
-
     if (!allParts) {
       console.error("[UploadManager] Critical: presignedUrls (allParts) is undefined or missing!");
       return [];
@@ -155,8 +165,36 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       }
     }
 
-    console.log(`[UploadManager] Task queue populated with ${result.length} remaining chunks.`);
     return result;
+  }
+
+  /**
+   * Fetches fresh presigned URLs for the given part numbers.
+   * Used on resume, since originally-issued URLs may have expired.
+   */
+  async function reSignParts(partNumbers: number[]): Promise<PresignedPart[]> {
+    if (!session || partNumbers.length === 0) return [];
+
+    const response = await uploadApi.singleChunk({
+      uploadId: session.uploadId,
+      key: session.key,
+      partNumbers,
+    });
+
+    return response.parts.map((p) => ({ partNumber: p.partNumber, url: p.presignedUrl }));
+  }
+
+  /**
+   * Reports a successfully uploaded chunk to the backend so server-side
+   * state stays in sync, independent of local storage. Fire-and-forget:
+   * local state is already authoritative for resuming this session, so a
+   * failure here shouldn't block the upload loop -- just log it.
+   */
+  function reportChunkUploaded(partNumber: number, etag: string): void {
+    if (!session) return;
+    uploadApi
+      .markAsChunkUploaded({ params: { vid: session.videoId }, etag, partNumber })
+      .catch((err) => console.error(`[UploadManager] Failed to report part ${partNumber} as uploaded`, err));
   }
 
   /**
@@ -166,101 +204,78 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   async function uploadChunk(task: TaskQueue[number]): Promise<string> {
     if (!session) throw new Error("Session lost during upload");
 
-    console.log(`[UploadManager] Beginning upload for Part #${task.part.partNumber} (${task.startByte}-${task.endByte} bytes)`);
+    const p = task.part.partNumber;
     let chunkPath: string | null = null;
-    const controller = new AbortController();
-    activeUploads.set(task.part.partNumber, { controller, partNumber: task.part.partNumber });
+    activeUploads.set(p, { controller: new AbortController(), partNumber: p });
 
     try {
-      chunkPath = await createChunkFile(
-        session.fileUri,
-        session.uploadId,
-        task.part.partNumber,
-        task.startByte,
-        task.endByte,
-      );
-      console.log(`[UploadManager] Temporary chunk file created at: ${chunkPath}`);
+      chunkPath = await createChunkFile(session.fileUri, session.uploadId, p, task.startByte, task.endByte);
 
-      // return await uploadChunkInBackground({
-      //   filePath: chunkPath,
-      //   url: task.part.url,
-      //   signal: controller.signal,
-      //   onProgress: (progress) => {
-      //     console.log(`[UploadManager] Part #${task.part.partNumber} Progress: ${(progress * 100).toFixed(1)}%`);
-      //     callbacks?.onChunkProgress?.(task.part.partNumber, progress);
-      //   },
-      // });
+      let resolvedEtag: string | null = null;
 
       const worker = new UploadWorker(
-        [
-          {
-            partNumber: task.part.partNumber,
-            fileUri: chunkPath,
-            url: task.part.url,
-            startByte: task.startByte,
-            endByte: task.endByte,
-          },
-        ],
+        [{ partNumber: p, fileUri: chunkPath, url: task.part.url, startByte: task.startByte, endByte: task.endByte }],
         {
-          onProgress: (part, progress) => {
-            callbacks?.onChunkProgress?.(
-              part,
-              progress
-            );
-          },
+          onChunkProgress: ({ partNumber, uploadedBytes }) => {
+            activeChunkBytes.set(partNumber, uploadedBytes);
+            if (!session) return;
 
-          onCompleted: (part, etag) => {
-            console.log(
-              `Part ${part} uploaded. ETag=${etag}`
-            );
-          },
+            const activeBytes = Array.from(activeChunkBytes.values()).reduce((sum, bytes) => sum + bytes, 0);
+            const totalUploadedBytes = (session.uploadedParts.length * session.chunkSize) + activeBytes;
 
-          onError: (part, error) => {
-            console.error(
-              `Part ${part} failed`,
-              error
-            );
+            emitProgress(totalUploadedBytes);
+          },
+          onChunkComplete: (partNumber, etag) => {
+            activeChunkBytes.delete(partNumber);
+            resolvedEtag = etag;
+          },
+          onChunkError: (partNumber, error) => {
+            activeChunkBytes.delete(partNumber);
+            console.error(`[UploadManager] Part ${partNumber} failed`, error);
           },
         }
       );
 
-      const [etag] = await worker.run();
-      return etag
+      await worker.run();
+
+      if (!resolvedEtag) {
+        throw new Error(`Upload completed without an etag for part ${p}`);
+      }
+
+      return resolvedEtag;
     } finally {
-      activeUploads.delete(task.part.partNumber);
+      activeUploads.delete(p);
       if (chunkPath) {
-        console.log(`[UploadManager] Cleaning up temp file for Part #${task.part.partNumber}`);
-        await deleteChunkFile(chunkPath).catch(err => console.error("[UploadManager] File deletion failed", err));
+        await deleteChunkFile(chunkPath).catch((err) =>
+          console.error("[UploadManager] File deletion failed", err)
+        );
       }
     }
   }
 
   function handleUploadSuccess(partNumber: number, etag: string): void {
-    console.log(`[UploadManager] S3 accepted Part #${partNumber} with ETag: ${etag}`);
-    if (!session || cancelled) {
-      console.warn(`[UploadManager] handleUploadSuccess abandoned. Session active: ${!!session}, Cancelled: ${cancelled}`);
-      return;
-    }
+    if (!session || cancelled) return;
 
-    if (session.uploadedParts.some((p) => p.partNumber === partNumber)) {
-      console.log(`[UploadManager] Part #${partNumber} already logged in session. Ignoring duplicate.`);
-      return;
-    }
+    if (session.uploadedParts.some((p) => p.partNumber === partNumber)) return;
 
-    session = {
-      ...session,
-      uploadedParts: [...session.uploadedParts, { partNumber, etag }],
-    };  
+    activeChunkBytes.delete(partNumber);
+    session = { ...session, uploadedParts: [...session.uploadedParts, { partNumber, etag }] };
     persist();
-    callbacks?.onProgress?.(calculateProgress());
+
+    reportChunkUploaded(partNumber, etag);
+
+    const activeBytes = Array.from(activeChunkBytes.values()).reduce((sum, bytes) => sum + bytes, 0);
+    const uploadedBytes = (session.uploadedParts.length * session.chunkSize) + activeBytes;
+    emitProgress(uploadedBytes);
   }
 
   function handleUploadFailure(error: unknown): void {
-    console.error("[UploadManager] Internal worker error encountered:", error);
     if (error instanceof Error && error.name === "AbortError") {
-      console.log("[UploadManager] Abort handled intentionally (upload was paused/cancelled).");
+      // Intentional abort from pause/cancel; not a real failure.
       return;
     }
+
+    console.error("[UploadManager] Internal worker error encountered:", error);
 
     if (session) {
       session = { ...session, status: "FAILED" };
@@ -268,20 +283,18 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     }
     updateStatus("FAILED");
     callbacks?.onError?.(error instanceof Error ? error : new Error(String(error)));
+    UploadNotificationService.showFailed();
   }
 
   function getNextTask(): TaskQueue[number] | null {
     if (!taskQueue || cursor >= taskQueue.length) {
-      console.log(`[UploadManager] Queue ended or empty. Cursor: ${cursor}, Queue size: ${taskQueue?.length ?? 0}`);
       return null;
     }
     const currentTask = taskQueue[cursor++];
-    console.log(`[UploadManager] Worker claiming next task. Queue Index: ${cursor - 1}/${taskQueue.length} (Part #${currentTask.part.partNumber})`);
     return currentTask ?? null;
   }
 
   async function worker(): Promise<void> {
-    console.log("[UploadManager] Concurrent worker thread spawned.");
     while (!paused && !cancelled) {
       const task = getNextTask();
       if (!task) break;
@@ -294,7 +307,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
         return; // Terminal error ends this execution thread
       }
     }
-    console.log(`[UploadManager] Worker thread closing down. Reason -> Paused: ${paused}, Cancelled: ${cancelled}`);
   }
 
   /**
@@ -306,10 +318,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       return;
     }
 
-    console.log(`[UploadManager] Processing queue. Status: ${session.status}, Uploaded parts tally: ${session.uploadedParts.length}/${session.totalParts}`);
-
     if (session.uploadedParts.length >= session.totalParts) {
-      console.log("[UploadManager] Quick check reveals all parts are already uploaded. Skipping to completeUpload.");
       await completeUpload();
       return;
     }
@@ -320,8 +329,8 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     session = { ...session, status: "UPLOADING" };
     persist();
     updateStatus("UPLOADING");
+    UploadNotificationService.showProgress(0);
 
-    console.log(`[UploadManager] Spawning ${CONCURRENCY} concurrent pipeline workers...`);
     // Each worker runs independently and competes for tasks from the shared queue.
     await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
@@ -331,10 +340,8 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       updateStatus("PAUSED");
     } else if (session && session.uploadedParts.length >= session.totalParts) {
       await completeUpload();
-    } else if (session) {
-      // Workers stopped (e.g. a non-retryable failure already set status FAILED
-      // and returned from worker()) without completing — nothing further to do here.
-      console.warn("[UploadManager] Queue drained without reaching FAILED/PAUSED/CANCELLED, and not all parts uploaded.");
+    } else if (!session) {
+      UploadNotificationService.showFailed();
     }
   }
 
@@ -344,14 +351,12 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   async function completeUpload(): Promise<void> {
     if (!session) return;
 
-    console.log("[UploadManager] Finalizing process: Submitting complete upload command to API.");
     session = { ...session, status: "COMPLETING" };
     persist();
+    updateStatus("COMPLETING");
 
     try {
       const sortedParts = [...session.uploadedParts].sort((a, b) => a.partNumber - b.partNumber);
-
-      console.log("[UploadManager] Dispatching payload to uploadApi.complete with sorted parts structure:", JSON.stringify(sortedParts));
 
       await uploadApi.complete({
         uploadId: session.uploadId,
@@ -359,16 +364,17 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
         parts: sortedParts,
       });
 
-      console.log("[UploadManager] Backend accepted merge. Clearing persistent store allocations.");
       session = { ...session, status: "COMPLETED" };
       persist();
       uploadStorage.removeSession();
       updateStatus("COMPLETED");
+      UploadNotificationService.showCompleted();
     } catch (error) {
-      console.error("[UploadManager] API Exception trying to compile/complete tracking multipart process:", error);
+      console.error("[UploadManager] API exception while completing multipart upload:", error);
       session = { ...session, status: "FAILED" };
       persist();
       callbacks?.onError?.(error instanceof Error ? error : new Error(String(error)));
+      UploadNotificationService.showFailed();
     }
   }
 
@@ -376,7 +382,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
    * Starts a new upload session.
    */
   async function start(params: StartUploadParams): Promise<void> {
-    console.log("[UploadManager] Initializing start command. Input params payload:", JSON.stringify(params, null, 2));
     clearStaleSession();
     if (uploadStorage.hasSession()) {
       console.error("[UploadManager] System locked. Storage states show a parallel active session.");
@@ -386,9 +391,10 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     paused = false;
     cancelled = false;
 
+    updateStatus("INITIALIZING");
+
     const { allowRating, ...restMetadata } = params.metadata;
 
-    console.log("[UploadManager] Contacting uploadApi.initialize backend service...");
     const initResponse = await uploadApi.initialize({
       ...restMetadata,
       fileName: params.fileName,
@@ -397,19 +403,19 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       allowRatings: allowRating,
     });
 
-    console.log("[UploadManager] Backend response from initialize:", JSON.stringify(initResponse, null, 2));
-
-    // Notice we map incoming API fields directly here
     session = {
       videoId: initResponse.videoId,
       uploadId: initResponse.uploadId,
+      key: initResponse.objectKey,
       fileUri: params.fileUri,
       fileName: params.fileName,
       mimeType: params.mimeType,
       fileSize: params.fileSize,
       chunkSize: initResponse.chunkSize,
       totalParts: initResponse.totalChunks,
-      presignedUrls: initResponse.urls, // Ensure your schema normalizes target fields perfectly
+      // default keep 0
+      highestProgressReached: 0,
+      presignedUrls: initResponse.urls,
       uploadedParts: [],
       metadata: params.metadata,
       status: "INITIATED",
@@ -417,17 +423,17 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       updatedAt: Date.now(),
     };
 
-    console.log("[UploadManager] Setting session snapshot into memory landscape storage.");
     persist();
+    updateStatus("INITIATED");
     await processQueue();
   }
 
   /**
    * Resumes an interrupted upload.
-   * Fetches server state to avoid duplicate uploads.
+   * Fetches server state to avoid duplicate uploads, then re-signs
+   * URLs for any remaining parts since the originals may have expired.
    */
   async function resume(): Promise<void> {
-    console.log("[UploadManager] Processing resume command initiation.");
     const stored = uploadStorage.getSession();
     if (!stored) {
       console.error("[UploadManager] Action blocked: Local instance cache metadata layer lookup yielded null.");
@@ -437,21 +443,73 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     session = stored;
     paused = false;
     cancelled = false;
+    updateStatus("INITIALIZING");
 
-    console.log(`[UploadManager] Validating remote stream for video tracker node ID: ${session.videoId}`);
     const serverState = await uploadApi.getStatus(session.videoId);
-    console.log("[UploadManager] Sync Response from Remote Tracking Status Node:", JSON.stringify(serverState, null, 2));
+
+
 
     if (serverState.status === "COMPLETED") {
-      console.log("[UploadManager] Core server records specify asset is already finished processing.");
       uploadStorage.removeSession();
       updateStatus("COMPLETED");
       return;
     }
 
     session = { ...session, uploadedParts: serverState.uploadedParts };
-    persist();
 
+    // Recalculate progress after syncing with backend
+    const uploadedBytes = Math.min(
+      session.uploadedParts.length * session.chunkSize,
+      session.fileSize,
+    );
+
+// deleteChunkFile
+    const realProgress =
+      (uploadedBytes / session.fileSize) * 100;
+
+    session = {
+      ...session,
+      highestProgressReached: Math.max(
+        session.highestProgressReached ?? 0,
+        realProgress,
+      ),
+    };
+
+    callbacks?.onProgress?.({
+      progress: session.highestProgressReached,
+      uploadedBytes,
+      totalBytes: session.fileSize,
+
+      activeParts: activeChunkBytes.size,
+
+      completedParts:
+        session.uploadedParts.length,
+
+      totalParts:
+        session.totalParts,
+    });
+
+
+    const remainingPartNumbers = session.presignedUrls
+      .map((p) => p.partNumber)
+      .filter((partNumber) => !session!.uploadedParts.some((u) => u.partNumber === partNumber));
+
+    try {
+      const freshParts = await reSignParts(remainingPartNumbers);
+      if (freshParts.length > 0) {
+        const freshByPart = new Map(freshParts.map((p) => [p.partNumber, p]));
+        session = {
+          ...session,
+          presignedUrls: session.presignedUrls.map((p) => freshByPart.get(p.partNumber) ?? p),
+        };
+      }
+    } catch (error) {
+      // Non-fatal: fall back to the existing URLs. They may still be valid,
+      // and individual chunk failures will surface through the normal retry path.
+      console.error("[UploadManager] Failed to re-sign remaining parts on resume", error);
+    }
+
+    persist();
     await processQueue();
   }
 
@@ -459,13 +517,10 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
    * Pauses the upload. Aborts all active workers.
    */
   function pause(): void {
-    console.log("[UploadManager] Pause requested.");
     if (!session || session.status !== "UPLOADING") {
-      console.warn(`[UploadManager] Pause ignored. Session status is currently: ${session?.status ?? "NULL"}`);
       return;
     }
     paused = true;
-    console.log(`[UploadManager] Aborting ${activeUploads.size} executing upload chunk streams...`);
     activeUploads.forEach((upload) => upload.controller.abort());
     activeUploads.clear();
     updateStatus("PAUSED");
@@ -475,7 +530,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
    * Cancels the upload. Cleans up session and active uploads.
    */
   function cancel(): void {
-    console.log("[UploadManager] Cancel requested. Purging volatile structures.");
     cancelled = true;
     paused = false;
     activeUploads.forEach((upload) => upload.controller.abort());
@@ -491,8 +545,6 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
   function clearStaleSession(): void {
     const historicalSession = uploadStorage.getSession();
-    console.log("[UploadManager] Auditing local tracking layer cache for stale sessions:", JSON.stringify(historicalSession, null, 2));
-
     if (!historicalSession) return;
 
     const terminalStates = [
@@ -500,11 +552,10 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       "FAILED",
       "COMPLETED",
       "CANCELLED",
-      "UPLOADING"
+      "UPLOADING",
     ];
 
     if (terminalStates.includes(historicalSession.status)) {
-      console.log(`[UploadManager] Dropping non-resumable stale cache node pointing to status: ${historicalSession.status}`);
       uploadStorage.removeSession();
     }
   }
