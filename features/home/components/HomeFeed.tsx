@@ -66,6 +66,8 @@ export default function HomeFeed() {
     loadMore,
   } = useFeed(10);
 
+  console.log(JSON.stringify(videos[0],null,4))
+
   const translateY = useSharedValue(0);
   const lastScrollY = useSharedValue(0);
   const isHeaderHidden = useSharedValue(false);

@@ -72,6 +72,9 @@ export function useImagePicker(
         aspect,
         quality,
       });
+// console.log(result.assets![0].fileSize!/(1024*1024))
+
+//       console.log("result",JSON.stringify(result,null,5))
 
       if (result.canceled) {
         return null;

@@ -19,6 +19,8 @@ import {
 } from "../types/upload.types";
 import { createChunkFile, deleteChunkFile } from "../utils/chunk";
 import { UploadNotificationService } from "../service/notification.service";
+import { uploadThumbnail } from "../utils/uploadThumbnail";
+
 
 const CONCURRENCY = 3;
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000] as const;
@@ -386,6 +388,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     }
   }
 
+  // completeUpload (inside UploadManager)
   async function completeUpload(): Promise<void> {
     if (!session) return;
 
@@ -394,13 +397,24 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     updateStatus("COMPLETING");
 
     try {
-      const sortedParts = [...session.uploadedParts].sort((a, b) => a.partNumber - b.partNumber);
+      const sortedParts = [...session.uploadedParts].sort(
+        (a, b) => a.partNumber - b.partNumber,
+      );
 
       await uploadApi.complete({
         uploadId: session.uploadId,
         videoId: session.videoId,
         parts: sortedParts,
       });
+
+      // Upload thumbnail — MUST succeed before marking complete.
+      if (session.thumbnailPresignedUrl && session.thumbnailLocalUri) {
+        await uploadThumbnail(
+          session.thumbnailLocalUri,
+          session.thumbnailPresignedUrl,
+          session.thumbnailType ?? "image/jpeg",
+        );
+      }
 
       session = { ...session, status: "COMPLETED" };
       persist();
@@ -419,7 +433,10 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
       UploadNotificationService.showCompleted();
     } catch (error) {
-      console.error("[UploadManager] API exception while completing multipart upload:", error);
+      console.error(
+        "[UploadManager] API exception while completing multipart upload:",
+        error,
+      );
       session = { ...session, status: "FAILED" };
       persist();
       callbacks?.onError?.(error instanceof Error ? error : new Error(String(error)));
@@ -456,7 +473,15 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       mimeType: params.mimeType,
       fileSize: params.fileSize,
       allowRatings: allowRating,
+      thumbnailType: params.thumbnailType ?? "image/jpeg"
     });
+
+    console.log(JSON.stringify(initResponse, null, 2))
+
+    // if (params.thumbnailBlob && initResponse.thumbnailUrl) {
+    //   uploadThumbnail({initResponse.thumbnailUrl, params.thumbnailBlob})
+    //     .catch(err => console.error("Thumbnail upload failed:", err));
+    // }
 
     session = {
       videoId: initResponse.videoId,
@@ -469,6 +494,10 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       chunkSize: initResponse.chunkSize,
       totalParts: initResponse.totalChunks,
       presignedUrls: initResponse.urls,
+      // thumbnail related work
+      thumbnailLocalUri: params.thumbnailLocalUri,
+      thumbnailType: params.thumbnailType,
+      thumbnailPresignedUrl: initResponse.thumbnailPresignedUrl?.url,
       uploadedParts: [],
       metadata: params.metadata,
       status: "INITIATED",
@@ -620,6 +649,35 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     for (const p of server) merged.set(p.partNumber, p);
     return Array.from(merged.values());
   }
+
+  // async function uploadThumbnail(thumbnailPresignedUrl: string | { url: string }): Promise<void> {
+  //   console.log({ thumbnailPresignedUrl })
+  //   // Handle both string and object formats
+  //   const url = typeof thumbnailPresignedUrl === 'string'
+  //     ? thumbnailPresignedUrl
+  //     : thumbnailPresignedUrl?.url;
+
+  //   if (!url || typeof url !== 'string') {
+  //     throw new Error(`Invalid thumbnail presigned URL: ${JSON.stringify(thumbnailPresignedUrl)}`);
+  //   }
+
+  //   const thumbnailBlob = session?.thumbnailBlob;
+  //   if (!thumbnailBlob) {
+  //     throw new Error("No thumbnail blob available for upload");
+  //   }
+
+  //   const response = await fetch(url, {
+  //     method: "PUT",
+  //     body: thumbnailBlob,
+  //     headers: {
+  //       "Content-Type": session?.thumbnailType ?? "image/jpeg",
+  //     },
+  //   });
+
+  //   if (!response.ok) {
+  //     throw new Error(`Thumbnail upload failed: ${response.status} ${response.statusText}`);
+  //   }
+  // }
 
   return {
     start,

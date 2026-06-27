@@ -34,6 +34,8 @@ function VideoCard({ item }: Props) {
   const avatarUrl = item.uploadedBy.avatarUrl ? getMediaUrl(item.uploadedBy.avatarUrl) : null;
   const videoUrl = getMediaUrl(item.objectKey);
 
+  console.log({thumbnailUrl})
+
   const handleRedirect = () => {
     if (!videoUrl) return;
 

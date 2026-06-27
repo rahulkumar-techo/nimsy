@@ -17,6 +17,7 @@ export type UploadStatus =
 
 // Visibility options matching backend
 export type Visibility = "PUBLIC" | "PRIVATE" | "UNLISTED";
+export type thumbnailType = "image/png" | "image/jpeg" | string;
 
 // Chapter metadata for video
 export interface Chapter {
@@ -48,6 +49,7 @@ export interface UploadInitRequest {
   allowRatings: boolean;
   allowComments: boolean;
   chapters: Chapter[];
+  thumbnailType: thumbnailType;
 }
 
 // Part of a presigned URL from backend
@@ -64,6 +66,9 @@ export interface UploadInitResponse {
   chunkSize: number;
   totalChunks: number;
   urls: PresignedPart[];
+  thumbnailKey?: string,
+  thumbnailPresignedUrl?: ThumbnailPresignedResponse,
+  previewKey?: string,
 }
 
 // Uploaded part tracking ETag
@@ -114,6 +119,17 @@ export interface UploadSession {
   status: UploadStatus;
   createdAt: number;
   updatedAt: number;
+  thumbnailKey?: string;
+  thumbnailPresignedUrl?: string;
+  thumbnailLocalUri: string | undefined;
+  thumbnailType?: thumbnailType;
+}
+
+
+// 
+export type ThumbnailPresignedResponse = {
+  url: string;
+  key: string;
 }
 
 // Parameters to start a new upload
@@ -122,9 +138,13 @@ export interface StartUploadParams {
   fileName: string;
   mimeType: string;
   fileSize: number;
+  thumbnailLocalUri: string | undefined;
+  thumbnailType?: thumbnailType;
   metadata: UploadMetadata;
-}
 
+}
+// thumbnailType: isPng ? "image/jpeg" : "image/jpeg",
+// 
 // Callbacks for upload events
 export interface UploadCallbacks {
   /**
@@ -152,8 +172,8 @@ export interface ProgressUpdate {
   activeParts: number; // number of parts currently uploading
   completedParts: number; // number of parts fully uploaded
   totalParts: number; // total parts for this upload
-  completedBytes?:number;
-  inFlightBytes?:number;
+  completedBytes?: number;
+  inFlightBytes?: number;
 }
 
 // Progress state for UI
