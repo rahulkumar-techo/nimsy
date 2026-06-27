@@ -5,13 +5,14 @@
 
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import {
-    createContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
+import * as SplashScreen from "expo-splash-screen";
 
 import { authStorage, User } from "@/features/auth/utils/auth-storage";
 // import { useAuthActions } from "@/hooks/useAuthActions";
@@ -22,7 +23,7 @@ export type { User };
 export type AuthContextType = {
   user: User | null;
   hasCompletedOnboarding: boolean;
-   setHasCompletedOnboarding: (value: boolean) => void;
+  setHasCompletedOnboarding: (value: boolean) => void;
   isOnboardingReady: boolean;
   setUser: (user: User | null) => void;
   refreshUser: () => Promise<void>;
@@ -44,12 +45,9 @@ export const AuthProvider = ({
    * Fetch current user from backend
    */
   const refreshUser = useCallback(async () => {
-    console.log("REFRESH USER CALLED");
     try {
-      console.log("BEFORE API CALL");
 
       const response = await authService.getProfile();
-console.log("After API CALL");
 
       if (!response?.data) {
         setUserState(null);
@@ -62,7 +60,7 @@ console.log("After API CALL");
         response.data.onboardingCompleted
       );
     } catch (error) {
-      console.log("Failed to fetch user", error);
+      console.error("Failed to fetch user", error);
       setUserState(null);
       setHasCompletedOnboarding(false);
     }
@@ -71,30 +69,23 @@ console.log("After API CALL");
   /**
    * Restore authentication state on app launch
    */
-useEffect(() => {
-    console.log("AUTH EFFECT RUN");
-  const initializeAuth = async () => {
-     console.log("INIT START");
-    try {
-      const accessToken =
-        await authStorage.getAccessToken();
-        console.log(accessToken)
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const accessToken =await authStorage.getAccessToken();
 
-      if (accessToken) {
-        await refreshUser();
+        if (accessToken) {
+          await refreshUser();
+        }
+      } catch (error) {
+      } finally {
+        setIsOnboardingReady(true);
+        await SplashScreen.hideAsync();
       }
-    } catch (error) {
-      console.log(
-        "Failed to initialize auth",
-        error
-      );
-    } finally {
-      setIsOnboardingReady(true);
-    }
-  };
+    };
 
-  initializeAuth();
-}, [refreshUser]);
+    initializeAuth();
+  }, [refreshUser]);
 
   /**
    * Update user in memory
