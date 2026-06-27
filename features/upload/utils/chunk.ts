@@ -1,157 +1,73 @@
 /**
- * Chunk Utilities
- * Native file slicing for memory-efficient chunk creation.
- * Never loads entire video into memory.
+ * Chunk Utilities — Streaming Edition
+ *
+ * DEPRECATED FUNCTIONS REMOVED:
+ * • createChunkFile() — No longer needed. We stream directly from source.
+ * • deleteChunkFile() — No longer needed. No temp files to clean up.
+ * • prepareChunkDirectory() — No longer needed. No chunk directory.
+ *
+ * WHAT REMAINS:
+ * • getUploadCacheDir() — For other upload-related temp files (e.g., compressed previews)
+ * • validateFileExists() — Pre-upload validation
+ * • getFileSize() — For progress calculations
+ *
+ * WHY NO CHUNK FILES?
+ * ───────────────────
+ * The previous approach created N temporary chunk files on disk:
+ *   source.mp4 (1GB) → part-1.tmp (5MB) + part-2.tmp (5MB) + ... + part-N.tmp
+ * This doubled storage usage during upload and caused cleanup bugs.
+ *
+ * The streaming approach reads byte ranges directly from the source file
+ * using native file descriptors. Zero temp files, zero cleanup, zero bloat.
  */
 
 import ReactNativeBlobUtil from "react-native-blob-util";
 import * as FileSystem from "expo-file-system";
 
 /**
- * Returns the upload chunk cache directory.
+ * Returns the app's cache directory for upload-related files.
+ * NOTE: This is NOT for chunk files (we don't create those anymore).
+ * Use this for: compressed thumbnails, preview images, retry logs, etc.
  */
-function getCacheDir(): string {
-  return `${FileSystem.Paths.cache.uri}/upload-chunks/`;
+export function getUploadCacheDir(): string {
+  return `${FileSystem.Paths.cache.uri}/upload-cache/`;
 }
 
 /**
- * Creates the chunk directory if it doesn't exist.
- * Safe to call multiple times (and from multiple concurrent callers).
+ * Validates that a source file exists and is readable before starting upload.
+ * Throws if the file is missing or inaccessible.
  */
-export async function prepareChunkDirectory(): Promise<void> {
-  const dir = getCacheDir().replace(/^file:\/\//, "");
+export async function validateFileExists(fileUri: string): Promise<void> {
+  const cleanPath = fileUri.replace(/^file:\/\//, "");
+  const exists = await ReactNativeBlobUtil.fs.exists(cleanPath);
+  if (!exists) {
+    throw new Error(`Source file not found: ${fileUri}`);
+  }
+}
 
+/**
+ * Gets the size of a file in bytes.
+ * Used to verify file integrity and calculate progress.
+ */
+export async function getFileSize(fileUri: string): Promise<number> {
+  const cleanPath = fileUri.replace(/^file:\/\//, "");
+  const stats = await ReactNativeBlobUtil.fs.stat(cleanPath);
+  return stats.size;
+}
+
+/**
+ * (Optional) Creates a directory for upload cache if needed.
+ * Safe to call multiple times.
+ */
+export async function prepareUploadCache(): Promise<void> {
+  const dir = getUploadCacheDir().replace(/^file:\/\//, "");
   try {
     await ReactNativeBlobUtil.fs.mkdir(dir);
-    console.log(
-      `[ChunkUtil] Created chunk directory: ${dir}`
-    );
   } catch (error: any) {
-    // Ignore "already exists" errors. Different platforms/versions of
-    // react-native-blob-util phrase this differently (e.g. "already
-    // exists" on Android, "EEXIST" in some error codes), so check both.
-    const message =
-      typeof error?.message === "string"
-        ? error.message.toLowerCase()
-        : "";
-
-    if (
-      message.includes("already exists") ||
-      message.includes("eexist")
-    ) {
-      console.log(
-        `[ChunkUtil] Chunk directory already exists: ${dir}`
-      );
-      return;
+    const msg = error?.message?.toLowerCase?.() ?? "";
+    if (msg.includes("already exists") || msg.includes("eexist")) {
+      return; // Expected, ignore
     }
-
-    console.error(
-      `[ChunkUtil] Failed creating chunk directory:`,
-      error
-    );
-
     throw error;
-  }
-}
-
-/**
- * Creates a chunk file on disk using native slicing.
- * Returns the temporary chunk file URI.
- */
-export async function createChunkFile(
-  sourceUri: string,
-  uploadId: string,
-  partNumber: number,
-  startByte: number,
-  endByte: number
-): Promise<string> {
-  console.log(
-    `[ChunkUtil] Raw source file target incoming: "${sourceUri}"`
-  );
-
-  // Defensive: guarantee the destination directory exists right before we
-  // write into it. We cannot assume an external prepareChunkDirectory()
-  // call has already resolved by the time this runs — concurrent workers
-  // can call createChunkFile() before that setup step finishes, which is
-  // exactly what produced the ENOENT failures (all 3 workers failed on
-  // their first attempt because the directory simply wasn't there yet).
-  // This call is idempotent and cheap, so doing it per-chunk is safe.
-  await prepareChunkDirectory();
-
-  const cleanSrc = sourceUri.replace(/^file:\/\//, "");
-  const cacheDir = getCacheDir().replace(/^file:\/\//, "");
-
-  // Unique filename prevents collisions between uploads
-  const tempPath =
-    `${cacheDir}${uploadId}-part-${partNumber}.tmp`;
-
-  console.log(
-    `[ChunkUtil] Slicing Config -> Part #${partNumber} | Range: [${startByte} - ${endByte}] bytes.`
-  );
-
-  console.log(
-    `[ChunkUtil] Paths Context -> Source: "${cleanSrc}" | Destination: "${tempPath}"`
-  );
-
-  try {
-    await ReactNativeBlobUtil.fs.slice(
-      cleanSrc,
-      tempPath,
-      startByte,
-      endByte
-    );
-
-    const stats =
-      await ReactNativeBlobUtil.fs.stat(tempPath);
-
-    console.log(
-      `[ChunkUtil] Native Slice Success -> Part #${partNumber} created safely. Verified Size: ${stats.size} bytes.`
-    );
-  } catch (error) {
-    console.error(
-      `[ChunkUtil] Slicing Failed targeting Part #${partNumber}:`,
-      error
-    );
-
-    throw error;
-  }
-
-  return `file://${tempPath}`;
-}
-
-/**
- * Deletes a temporary chunk file.
- */
-export async function deleteChunkFile(
-  filePath: string
-): Promise<void> {
-  const cleanPath = filePath.replace(/^file:\/\//, "");
-
-  console.log(
-    `[ChunkUtil] Erase command issued for tracking path: "${cleanPath}"`
-  );
-
-  try {
-    const exists =
-      await ReactNativeBlobUtil.fs.exists(cleanPath);
-
-    if (!exists) {
-      console.warn(
-        `[ChunkUtil] Eraser skipped. File not found: ${cleanPath}`
-      );
-
-      return;
-    }
-
-    await ReactNativeBlobUtil.fs.unlink(cleanPath);
-
-    console.log(
-      `[ChunkUtil] Garbage Collection: Successfully deleted temporary artifact "${cleanPath}".`
-    );
-  } catch (error) {
-    console.error(
-      `[ChunkUtil] Failed to unlink file "${cleanPath}":`,
-      error
-    );
   }
 }

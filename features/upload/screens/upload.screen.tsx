@@ -21,6 +21,8 @@ export default function UploadVideoScreen() {
   const { video, pickVideo } = useVideoUpload();
   const router = useRouter();
 
+  
+
   const { step, stepIndex, isFirst, isLast, goNext, goBack } = useUploadSteps();
   const {
     form,

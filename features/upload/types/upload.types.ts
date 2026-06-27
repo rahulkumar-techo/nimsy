@@ -1,9 +1,8 @@
 /**
  * Upload Types
- * Strict TypeScript interfaces for the upload system.
+ * Aligned with backend API contract.
  */
 
-// Upload lifecycle statuses
 export type UploadStatus =
   | "IDLE"
   | "INITIALIZING"
@@ -13,87 +12,179 @@ export type UploadStatus =
   | "COMPLETING"
   | "COMPLETED"
   | "FAILED"
-  | "CANCELLED";
+  | "CANCELLED"
 
-// Visibility options matching backend
 export type Visibility = "PUBLIC" | "PRIVATE" | "UNLISTED";
-export type thumbnailType = "image/png" | "image/jpeg" | string;
+export type ThumbnailType = "image/png" | "image/jpeg";
 
-// Chapter metadata for video
 export interface Chapter {
-  id: string;
   title: string;
-  startTime: number;
+  time: number;
 }
 
-// Metadata sent to backend during initialization
-export interface UploadMetadata {
-  title: string;
-  description?: string;
-  visibility: Visibility;
-  madeForKids: boolean;
-  chapters: Chapter[];
-  allowComments: boolean;
-  allowRating: boolean;
-}
+// ─── Backend API Types ────────────────────────────────────────────────────
 
-// Request payload for POST /upload/init
 export interface UploadInitRequest {
   title: string;
   description?: string;
   fileName: string;
   mimeType: string;
   fileSize: number;
-  visibility: Visibility;
   madeForKids: boolean;
   allowRatings: boolean;
   allowComments: boolean;
   chapters: Chapter[];
-  thumbnailType: thumbnailType;
+  thumbnailType: ThumbnailType;
 }
 
-// Part of a presigned URL from backend
+// Backend sends 'url', not 'presignedUrl'
 export interface PresignedPart {
   partNumber: number;
   url: string;
 }
 
-// Response from POST /upload/init
+export interface ThumbnailPresignedResponse {
+  url: string;
+  key: string;
+}
+
 export interface UploadInitResponse {
+  success: boolean;
   videoId: string;
+  uploadSessionId: string;
   uploadId: string;
   objectKey: string;
   chunkSize: number;
   totalChunks: number;
   urls: PresignedPart[];
-  thumbnailKey?: string,
-  thumbnailPresignedUrl?: ThumbnailPresignedResponse,
-  previewKey?: string,
+  thumbnailKey?: string;
+  thumbnailPresignedUrl?: ThumbnailPresignedResponse;
+  previewKey?: string;
 }
 
-// Uploaded part tracking ETag
 export interface UploadedPart {
   partNumber: number;
   etag: string;
 }
 
-// Response from GET /videos/:videoId/upload/status
 export interface UploadStatusResponse {
-  uploadedParts: UploadedPart[];
+  videoId: string;
   status: "INITIATED" | "UPLOADING" | "COMPLETED" | "FAILED";
+  progress: number;
+  uploadedChunks: number;
+  totalChunks: number;
+  remainingChunks: number;
+  isCompleted: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  uploadedParts?: UploadedPart[];
 }
 
-// Complete upload request body
 export interface CompleteUploadRequest {
   videoId: string;
   uploadId: string;
   parts: UploadedPart[];
 }
 
-// Per-chunk status for granular tracking
+export interface SingleChunkUploadBody {
+  uploadId: string;
+  key: string;
+  partNumbers: number[];
+}
+
+export interface SignPartsResponse {
+  uploadId: string;
+  parts: PresignedPart[]; // Uses 'url' field
+}
+
+export interface BatchChunkReport {
+  params: { vid: string };
+  parts: UploadedPart[];
+}
+
+export interface ChunkUploadResponse {
+  progress: number;
+  uploadedChunks: number;
+  totalChunks: number;
+}
+
+export interface CancelUploadPayload {
+  videoId: string;
+  objectKey: string;
+  uploadId: string;
+}
+
+export interface CancelUploadResponse {
+  videoId: string;
+  status: string;
+}
+
+// ─── Frontend Session Types ───────────────────────────────────────────────
+
+export interface UploadSession {
+  videoId: string;
+  uploadId: string;
+  key: string;
+  fileUri: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  chunkSize: number;
+  totalParts: number;
+  uploadedParts: UploadedPart[];
+  presignedUrls: PresignedPart[]; // Uses 'url' field
+  status: UploadStatus;
+  createdAt: number;
+  updatedAt: number;
+  thumbnailLocalUri?: string;
+  thumbnailType?: ThumbnailType;
+  thumbnailPresignedUrl?: string;
+  thumbnailKey?: string;
+  previewKey?: string;
+  metadata?: {
+    title: string;
+    description?: string;
+  };
+}
+
+export interface StartUploadParams {
+  fileUri: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  thumbnailLocalUri?: string;
+  thumbnailType?: ThumbnailType;
+  metadata: {
+    title: string;
+    description?: string;
+    visibility: Visibility;
+    madeForKids: boolean;
+    allowComments: boolean;
+    allowRating: boolean;
+    chapters: Chapter[];
+  };
+}
+
+export interface ProgressUpdate {
+  progress: number;
+  uploadedBytes: number;
+  totalBytes: number;
+  activeParts: number;
+  completedParts: number;
+  totalParts: number;
+  completedBytes?: number;
+  inFlightBytes?: number;
+  speed?: number;
+}
+
+export interface UploadCallbacks {
+  onProgress?: (progress: ProgressUpdate) => void;
+  onStatusChange?: (status: UploadStatus) => void;
+  onError?: (error: Error) => void;
+}
+
 export type ChunkStatus = "PENDING" | "UPLOADING" | "DONE" | "FAILED" | "RETRYING";
 
-// Chunk metadata with retry tracking
 export interface ChunkMeta {
   partNumber: number;
   status: ChunkStatus;
@@ -101,104 +192,3 @@ export interface ChunkMeta {
   retryCount: number;
   lastError?: string;
 }
-
-// Persisted upload session stored in MMKV
-export interface UploadSession {
-  videoId: string;
-  uploadId: string;
-  fileUri: string;
-  fileName: string;
-  mimeType: string;
-  key: string;
-  fileSize: number;
-  chunkSize: number;
-  totalParts: number;
-  uploadedParts: UploadedPart[];
-  presignedUrls: PresignedPart[];
-  metadata: UploadMetadata;
-  status: UploadStatus;
-  createdAt: number;
-  updatedAt: number;
-  thumbnailKey?: string;
-  thumbnailPresignedUrl?: string;
-  thumbnailLocalUri: string | undefined;
-  thumbnailType?: thumbnailType;
-}
-
-
-// 
-export type ThumbnailPresignedResponse = {
-  url: string;
-  key: string;
-}
-
-// Parameters to start a new upload
-export interface StartUploadParams {
-  fileUri: string;
-  fileName: string;
-  mimeType: string;
-  fileSize: number;
-  thumbnailLocalUri: string | undefined;
-  thumbnailType?: thumbnailType;
-  metadata: UploadMetadata;
-
-}
-// thumbnailType: isPng ? "image/jpeg" : "image/jpeg",
-// 
-// Callbacks for upload events
-export interface UploadCallbacks {
-  /**
-   * Global upload progress with byte precision.
-   * Called frequently for smooth progress animation.
-   */
-  onProgress?: (progress: ProgressUpdate) => void;
-
-  /**
-   * Upload status changes.
-   */
-  onStatusChange?: (status: UploadStatus) => void;
-
-  /**
-   * Fatal upload error.
-   */
-  onError?: (error: Error) => void;
-}
-
-// Progress update with byte precision for smooth UI animation
-export interface ProgressUpdate {
-  progress: number; // 0-100 percentage
-  uploadedBytes: number; // cumulative uploaded bytes for this session
-  totalBytes: number; // total file size
-  activeParts: number; // number of parts currently uploading
-  completedParts: number; // number of parts fully uploaded
-  totalParts: number; // total parts for this upload
-  completedBytes?: number;
-  inFlightBytes?: number;
-}
-
-// Progress state for UI
-export interface UploadProgressState {
-  uploadedBytes: number;
-  totalBytes: number;
-  uploadedParts: number;
-  totalParts: number;
-}
-
-
-// -------------------------------
-
-
-export interface SingleChunkUploadBody {
-  uploadId: string;
-  key: string;
-  partNumbers: number[]
-}
-
-export interface SignPartsResponse {
-  uploadId: string;
-  parts: {
-    partNumber: number;
-    presignedUrl: string;
-  }[];
-}
-

@@ -7,6 +7,7 @@ import { RootState } from "@/store/store";
 import { UploadStatus } from "../types/upload.types";
 import { useUpload } from "../hooks/useUpload";
 
+
 // ─── Types ───────────────────────────────────────────────────────────
 interface UploadUIState {
   progress: number;
@@ -116,6 +117,12 @@ export default function UploadProgressScreen() {
   const ui: UploadUIState = useSelector((state: RootState) => state.uploadUI);
   const { cancelUpload } = useUpload();
 
+  //  // Auto-pause on background, resume on foreground
+  // useAppStateUploadHandler({
+  //   enabled: true,
+  //   onPause: () => console.log("[AppState] Upload paused — app backgrounded"),
+  //   onResume: () => console.log("[AppState] Upload resumed — app active"),
+  // });
   const {
     progress,
     uploadedBytes,

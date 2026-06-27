@@ -1,86 +1,78 @@
-// import { UploadNotificationService } from "./notification.service";
+/*
+I strongly suspect one of these:
 
-export interface UploadTask {
-  partNumber: number;
-  fileUri: string;
-  url: string;
-  startByte: number;
-  endByte: number;
-}
+Content-Type mismatch with S3.
+Temp chunk file no longer exists.
+Presigned URL expired.
+RNBlobUtil Android bug with chunk temp files.
+--
+always take care 
+Content-Type/signature mismatch.
+*/ 
 
-/**
- * Raw chunk progress payload from UploadWorker.
- * Contains only the raw bytes for this specific chunk upload.
- */
-export interface ChunkProgressUpdate {
-  partNumber: number;
-  uploadedBytes: number;
-  totalBytes: number;
-}
+import ReactNativeBlobUtil from "react-native-blob-util";
 
-/**
- * Callbacks for UploadWorker.
- * Worker only reports raw progress - no aggregation logic.
- */
+const DEBUG = typeof __DEV__ !== "undefined" && __DEV__;
+const log = (s: string, ...a: unknown[]) => DEBUG && console.log(`[UW][${s}]`, ...a);
+
+export interface UploadTask { partNumber: number; fileUri: string; url: string; }
+export interface ChunkProgressEvent { partNumber: number; uploadedBytes: number; totalBytes: number; }
 export interface UploadWorkerCallbacks {
-  /** Progress update for a single chunk */
-  onChunkProgress: (update: ChunkProgressUpdate) => void;
-  /** Chunk completed successfully with ETag */
-  onChunkComplete: (partNumber: number, etag: string) => void;
-  /** Chunk failed with error */
-  onChunkError: (partNumber: number, error: Error) => void;
+  onChunkProgress?: (e: ChunkProgressEvent) => void;
+  onChunkComplete?: (partNumber: number, etag: string) => void;
+  onChunkError?: (partNumber: number, error: Error) => void;
 }
 
 export class UploadWorker {
-  private readonly xhrMap = new Map<number, XMLHttpRequest>();
+  private requestTask: any = null;
+  private cancelled = false;
 
-  constructor(private readonly queue: UploadTask[], private readonly callbacks: UploadWorkerCallbacks) {}
+  constructor(private tasks: UploadTask[], private callbacks?: UploadWorkerCallbacks) {}
 
   async run(): Promise<void> {
-    for (const task of this.queue) {
+    for (const task of this.tasks) {
+      if (this.cancelled) throw new Error("AbortError");
       await this.upload(task);
     }
   }
 
-  cancel(partNumber?: number): void {
-    if (partNumber !== undefined) return this.xhrMap.get(partNumber)?.abort();
-    this.xhrMap.forEach((xhr) => xhr.abort());
-    this.xhrMap.clear();
+  cancel() {
+    this.cancelled = true;
+    try { this.requestTask?.cancel(); } catch {}
   }
 
-  private upload(task: UploadTask): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const p = task.partNumber;
-      this.xhrMap.set(p, xhr);
+  private async upload(task: UploadTask): Promise<void> {
+    const { partNumber, fileUri, url } = task;
+    const cleanPath = fileUri.replace(/^file:\/\//, "");
+    log("Upload", `part=${partNumber}`, cleanPath);
 
-      xhr.upload.onprogress = (e) => {
-        if (!e.lengthComputable || e.total === 0) return;
-        this.callbacks.onChunkProgress({ partNumber: p, uploadedBytes: e.loaded, totalBytes: e.total });
-      };
+    try {
+      this.requestTask = ReactNativeBlobUtil.fetch("PUT", url, 
+        { "Content-Type": "application/octet-stream" }, 
+        ReactNativeBlobUtil.wrap(cleanPath)
+      );
 
-      const handleErr = (err: Error) => {
-        this.xhrMap.delete(p);
-        this.callbacks.onChunkError(p, err);
-        reject(err);
-      };
+      this.requestTask.uploadProgress({ interval: 250 }, (written: number, total: number) => {
+        this.callbacks?.onChunkProgress?.({ partNumber, uploadedBytes: written, totalBytes: total });
+      });
 
-      xhr.onload = () => {
-        this.xhrMap.delete(p);
-        if (xhr.status < 200 || xhr.status >= 300) {
-          return handleErr(new Error(`Upload failed with status ${xhr.status}`));
-        }
-        const etag = (xhr.getResponseHeader("ETag") ?? xhr.getResponseHeader("etag") ?? "").replace(/"/g, "");
-        this.callbacks.onChunkComplete(p, etag);
-        resolve();
-      };
+      const resp = await this.requestTask;
+      const status = resp.info().status;
+      if (status < 200 || status >= 300) throw new Error(`HTTP ${status}`);
 
-      xhr.onerror = () => handleErr(new Error("Network error during upload"));
-      xhr.onabort = () => (this.xhrMap.delete(p), reject(new DOMException("Upload aborted", "AbortError")));
+      const headers = resp.info().headers;
+      const etag = headers?.ETag || headers?.etag || headers?.Etag;
+      if (!etag) throw new Error("Missing ETag");
 
-      xhr.open("PUT", task.url);
-      xhr.setRequestHeader("Content-Type", "application/octet-stream");
-      xhr.send({ uri: task.fileUri, name: `chunk-${p}.bin`, type: "application/octet-stream" } as any);
-    });
+      this.callbacks?.onChunkComplete?.(partNumber, etag.replace(/"/g, ""));
+      log("Upload", `part=${partNumber} success`);
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      if (this.cancelled) e.name = "AbortError";
+      this.callbacks?.onChunkError?.(partNumber, e);
+      throw e;
+    } finally {
+      this.requestTask = null;
+    }
   }
 }

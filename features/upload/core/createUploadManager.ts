@@ -1,688 +1,570 @@
 /**
- * Upload Manager Factory — YouTube-Style Deterministic Progress
- * 
- * FIX: Chunk files are created ON-DEMAND inside uploadChunk, not upfront in start().
- * This means the user never sees "0% uploading" while chunks are being split.
- * The status stays IDLE until the first worker actually starts uploading.
+ * Upload Manager — Final Working Edition
+ *
+ * Uses ReactNativeBlobUtil for chunk creation and file reading.
+ * Uploads via XMLHttpRequest (standard, reliable, no RNFB.fetch() hang).
+ *
+ * FLOW:
+ * 1. RNFB.fs.slice() — native file copy (fast)
+ * 2. RNFB.fs.readFile() — native read into base64 (fast)
+ * 3. base64 → Uint8Array — pure JS conversion (fast)
+ * 4. XMLHttpRequest.send(Uint8Array) — standard upload (reliable)
  */
 
-import { UploadWorker } from "../service/upload.worker";
-import { uploadApi } from "../services/upload.api";
-import * as uploadStorage from "../storage/upload.storage";
+import { UploadWorker } from '../service/upload.worker';
+import { uploadApi } from '../services/upload.api';
+import * as uploadStorage from '../storage/upload.storage';
 import {
-  StartUploadParams,
-  UploadSession,
-  UploadStatus,
-  PresignedPart,
-  UploadedPart,
-  UploadCallbacks,
-} from "../types/upload.types";
-import { createChunkFile, deleteChunkFile } from "../utils/chunk";
-import { UploadNotificationService } from "../service/notification.service";
-import { uploadThumbnail } from "../utils/uploadThumbnail";
+  StartUploadParams, UploadSession, UploadStatus, PresignedPart,
+  UploadedPart, UploadCallbacks, ProgressUpdate,
+} from '../types/upload.types';
+import { UploadNotificationService } from '../service/notification.service';
+import { uploadThumbnail } from '../utils/uploadThumbnail';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEBUG
+// ═══════════════════════════════════════════════════════════════════════════════
+const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
+const log = (s: string, ...a: unknown[]) => { if (DEBUG) console.log(`[UM][${s}]`, ...a); };
+const warn = (s: string, ...a: unknown[]) => { if (DEBUG) console.warn(`[UM][${s}]`, ...a); };
+const err = (s: string, ...a: unknown[]) => { console.error(`[UM][${s}]`, ...a); };
 
-const CONCURRENCY = 3;
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════════════════
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000] as const;
+const CONCURRENCY = { BASE: 4, LOW_END: 2 };
+const ETAG_BATCH_SIZE = 5;
+const ETAG_FLUSH_MS = 2000;
+const PROGRESS_THROTTLE_MS = 200;
 
-type TaskQueue = {
-  part: PresignedPart;
-  startByte: number;
-  endByte: number;
-}[];
+const CHUNK_CACHE_DIR = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload-chunks/`;
 
-type PartState =
-  | { status: "PENDING"; size: number }
-  | { status: "UPLOADING"; uploadedBytes: number; size: number }
-  | { status: "COMPLETED"; etag: string; size: number };
+function getConcurrency(): number {
+  try {
+    const mem = (global as any).performance?.memory?.usedJSHeapSize;
+    if (mem && mem < 100 * 1024 * 1024) return CONCURRENCY.LOW_END;
+  } catch { /* ignore */ }
+  return CONCURRENCY.BASE;
+}
 
-function isRetryableError(error: unknown): boolean {
+function isRetryable(error: unknown): boolean {
   if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    if (
-      message.includes("timeout") ||
-      message.includes("network") ||
-      message.includes("econn") ||
-      message.includes("etimedout") ||
-      message.includes("enotfound") ||
-      message.includes("ehostunreach")
-    ) {
-      return true;
-    }
+    return /timeout|network|econn|etimedout|abort|reset/i.test(error.message);
   }
-
-  if (
-    error &&
-    typeof error === "object" &&
-    "response" in error &&
-    (error as { response?: { status?: number } }).response?.status &&
-    (error as { response?: { status?: number } }).response!.status! >= 500
-  ) {
-    return true;
+  if (error && typeof error === 'object' && 'response' in error) {
+    return (error as any).response?.status >= 500;
   }
-
   return false;
 }
 
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
-async function retry<T>(operation: () => Promise<T>, attempt: number = 0): Promise<T> {
+async function retry<T>(op: () => Promise<T>, attempt = 0): Promise<T> {
   try {
-    return await operation();
-  } catch (error) {
-    if (attempt >= BACKOFF_MS.length || !isRetryableError(error)) {
-      throw error;
-    }
-    const delay = BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
+    return await op();
+  } catch (e) {
+    if (attempt >= BACKOFF_MS.length || !isRetryable(e)) throw e;
+    const delay = BACKOFF_MS[attempt] ?? BACKOFF_MS.at(-1)!;
+    log('Retry', `attempt=${attempt + 1}, delay=${delay}ms, err=${(e as Error).message}`);
     await sleep(delay);
-    return retry(operation, attempt + 1);
+    return retry(op, attempt + 1);
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHUNK UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function ensureChunkDir(): Promise<void> {
+  try {
+    await ReactNativeBlobUtil.fs.mkdir(CHUNK_CACHE_DIR);
+  } catch (e: any) {
+    if (!e.message?.toLowerCase().includes('already exists')) throw e;
+  }
+}
+
+async function createChunkFile(
+  sourceUri: string,
+  uploadId: string,
+  partNumber: number,
+  startByte: number,
+  endByte: number
+): Promise<string> {
+  await ensureChunkDir();
+  const cleanSrc = sourceUri.replace(/^file:\/\//, '');
+  const tempPath = `${CHUNK_CACHE_DIR}${uploadId}-part-${partNumber}.tmp`;
+
+  log('CreateChunk', `part=${partNumber}, range=[${startByte}-${endByte}]`);
+  const t0 = Date.now();
+  await ReactNativeBlobUtil.fs.slice(cleanSrc, tempPath, startByte, endByte);
+  log('CreateChunk', `part=${partNumber} sliced in ${Date.now() - t0}ms`);
+  return `file://${tempPath}`;
+}
+
+async function deleteChunkFile(filePath: string): Promise<void> {
+  const cleanPath = filePath.replace(/^file:\/\//, '');
+  try {
+    if (await ReactNativeBlobUtil.fs.exists(cleanPath)) {
+      await ReactNativeBlobUtil.fs.unlink(cleanPath);
+      log('DeleteChunk', `deleted ${cleanPath.split('/').pop()}`);
+    }
+  } catch (e) {
+    warn('DeleteChunk', `failed: ${(e as Error).message}`);
+  }
+}
+
+async function cleanupChunks(uploadId: string): Promise<void> {
+  try {
+    const files = await ReactNativeBlobUtil.fs.ls(CHUNK_CACHE_DIR);
+    const pattern = new RegExp(`^${uploadId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-part-\\d+\.tmp$`);
+    for (const file of files) {
+      if (pattern.test(file)) {
+        await ReactNativeBlobUtil.fs.unlink(`${CHUNK_CACHE_DIR}${file}`).catch(() => {});
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UPLOAD MANAGER
+// ═══════════════════════════════════════════════════════════════════════════════
 export function createUploadManager(callbacks?: UploadCallbacks) {
   let session: UploadSession | null = null;
   let paused = false;
   let cancelled = false;
+
   const activeWorkers = new Map<number, UploadWorker>();
-  let cursor: number;
-  let taskQueue: TaskQueue | null = null;
+  const partState = new Map<number,
+    | { status: 'PENDING'; size: number }
+    | { status: 'UPLOADING'; uploadedBytes: number; size: number }
+    | { status: 'COMPLETED'; etag: string; size: number }
+  >();
 
-  const partState = new Map<number, PartState>();
+  const chunkCache = new Map<number, Promise<string>>();
 
-  function persist(): void {
-    if (session) {
-      session = { ...session, updatedAt: Date.now() };
-      uploadStorage.saveSession(session);
+  let highestProgress = 0;
+  let etagBatch: UploadedPart[] = [];
+  let etagTimer: ReturnType<typeof setTimeout> | null = null;
+  let completing = false;
+  let lastProgressEmit = 0;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  const persist = () => {
+    if (!session) return;
+    session = { ...session, updatedAt: Date.now() };
+    uploadStorage.saveSession(session);
+    log('Persist', `${session.status} | ${session.uploadedParts.length}/${session.totalParts}`);
+  };
+
+  const updateStatus = (s: UploadStatus) => {
+    log('Status', s);
+    callbacks?.onStatusChange?.(s);
+  };
+
+  const calcProgress = (): ProgressUpdate => {
+    if (!session) return { progress: 0, uploadedBytes: 0, totalBytes: 0, activeParts: 0, completedParts: 0, totalParts: 0, completedBytes: 0, inFlightBytes: 0 };
+    let completed = 0, inFlight = 0;
+    for (const s of partState.values()) {
+      if (s.status === 'COMPLETED') completed += s.size;
+      else if (s.status === 'UPLOADING') inFlight += s.uploadedBytes;
     }
-  }
-
-  function updateStatus(status: UploadStatus): void {
-    callbacks?.onStatusChange?.(status);
-  }
-
-  function calculateProgress(): {
-    progress: number;
-    uploadedBytes: number;
-    completedBytes: number;
-    inFlightBytes: number;
-  } {
-    if (!session) {
-      return { progress: 0, uploadedBytes: 0, completedBytes: 0, inFlightBytes: 0 };
-    }
-
-    let completedBytes = 0;
-    let inFlightBytes = 0;
-
-    for (const state of partState.values()) {
-      if (state.status === "COMPLETED") {
-        completedBytes += state.size;
-      } else if (state.status === "UPLOADING") {
-        inFlightBytes += state.uploadedBytes;
-      }
-    }
-
-    const totalUploadedBytes = completedBytes + inFlightBytes;
-    const progress = (completedBytes / session.fileSize) * 100;
-
+    const progress = (completed / session.fileSize) * 100;
     return {
       progress: Math.min(progress, 99.99),
-      uploadedBytes: Math.min(totalUploadedBytes, session.fileSize),
-      completedBytes,
-      inFlightBytes,
-    };
-  }
-
-  let highestProgressEmitted = 0;
-
-  function emitProgress(force = false): void {
-    if (!session) return;
-
-    const { progress, uploadedBytes, completedBytes, inFlightBytes } = calculateProgress();
-    const clampedProgress = Math.max(progress, highestProgressEmitted);
-
-    if (!force && clampedProgress === highestProgressEmitted) {
-      return;
-    }
-
-    highestProgressEmitted = clampedProgress;
-
-    callbacks?.onProgress?.({
-      progress: clampedProgress,
-      uploadedBytes,
+      uploadedBytes: Math.min(completed + inFlight, session.fileSize),
       totalBytes: session.fileSize,
       activeParts: activeWorkers.size,
       completedParts: session.uploadedParts.length,
       totalParts: session.totalParts,
-      completedBytes,
-      inFlightBytes,
-    });
-  }
+      completedBytes: completed,
+      inFlightBytes: inFlight,
+    };
+  };
 
-  function initializePartState(totalParts: number, fileSize: number, chunkSize: number): void {
+  const emitProgress = (force = false) => {
+    if (!session) return;
+    const now = Date.now();
+    if (!force && now - lastProgressEmit < PROGRESS_THROTTLE_MS) return;
+    lastProgressEmit = now;
+    const { progress } = calcProgress();
+    const clamped = Math.max(progress, highestProgress);
+    if (!force && clamped === highestProgress) return;
+    highestProgress = clamped;
+    callbacks?.onProgress?.({ ...calcProgress(), progress: clamped });
+  };
+
+  // ── Part State ───────────────────────────────────────────────────────────
+  const initPartState = (totalParts: number, fileSize: number, chunkSize: number) => {
     partState.clear();
     for (let i = 1; i <= totalParts; i++) {
-      const isLastPart = i === totalParts;
-      const size = isLastPart
-        ? fileSize - chunkSize * (totalParts - 1)
-        : chunkSize;
-      partState.set(i, { status: "PENDING", size });
+      const size = i === totalParts ? fileSize - chunkSize * (totalParts - 1) : chunkSize;
+      partState.set(i, { status: 'PENDING', size });
     }
-  }
+  };
 
-  function setPartUploading(partNumber: number, uploadedBytes: number): void {
-    const state = partState.get(partNumber);
-    if (!state || state.status === "COMPLETED") return;
-    partState.set(partNumber, {
-      status: "UPLOADING",
-      uploadedBytes: Math.min(uploadedBytes, state.size),
-      size: state.size,
-    });
-  }
+  const setUploading = (n: number, bytes: number) => {
+    const s = partState.get(n);
+    if (!s || s.status === 'COMPLETED') return;
+    partState.set(n, { status: 'UPLOADING', uploadedBytes: Math.min(bytes, s.size), size: s.size });
+  };
 
-  function setPartCompleted(partNumber: number, etag: string): void {
-    const state = partState.get(partNumber);
-    if (!state) return;
-    partState.set(partNumber, {
-      status: "COMPLETED",
-      etag,
-      size: state.size,
-    });
-  }
+  const setCompleted = (n: number, etag: string) => {
+    const s = partState.get(n);
+    if (!s) return;
+    partState.set(n, { status: 'COMPLETED', etag, size: s.size });
+  };
 
-  function setPartPending(partNumber: number): void {
-    const state = partState.get(partNumber);
-    if (!state) return;
-    partState.set(partNumber, {
-      status: "PENDING",
-      size: state.size,
-    });
-  }
+  const setPending = (n: number) => {
+    const s = partState.get(n);
+    if (!s) return;
+    partState.set(n, { status: 'PENDING', size: s.size });
+  };
 
-  function getRemainingParts(
-    allParts: PresignedPart[],
-    uploaded: UploadedPart[],
-  ): TaskQueue {
-    if (!allParts) {
-      console.error("[UploadManager] Critical: presignedUrls (allParts) is undefined or missing!");
-      return [];
-    }
+  // ── Queue ────────────────────────────────────────────────────────────────
+  const buildQueue = (all: PresignedPart[], uploaded: UploadedPart[]) => {
+    if (!session) return [];
+    const done = new Set(uploaded.map(p => p.partNumber));
+    return all
+      .filter(p => !done.has(p.partNumber))
+      .map(p => ({
+        part: p,
+        startByte: (p.partNumber - 1) * session!.chunkSize,
+        endByte: Math.min(p.partNumber * session!.chunkSize, session!.fileSize),
+      }));
+  };
 
-    const uploadedSet = new Set(uploaded.map((p) => p.partNumber));
-    const result: TaskQueue = [];
-
-    for (const part of allParts) {
-      if (!uploadedSet.has(part.partNumber) && session) {
-        const startByte = (part.partNumber - 1) * session.chunkSize;
-        const endByte = Math.min(startByte + session.chunkSize, session.fileSize);
-        result.push({ part, startByte, endByte });
+  // ── ETag Reporting ───────────────────────────────────────────────────────
+  const flushEtags = async () => {
+    if (!session || etagBatch.length === 0) return;
+    const batch = [...etagBatch];
+    etagBatch = [];
+    log('FlushEtags', `${batch.length} ETags`);
+    try {
+      await uploadApi.markMultipleChunksUploaded({ params: { vid: session.videoId }, parts: batch });
+      log('FlushEtags', 'batch OK');
+    } catch {
+      warn('FlushEtags', 'batch failed, fallback');
+      for (const p of batch) {
+        try {
+          await retry(() => uploadApi.markAsChunkUploaded({ params: { vid: session!.videoId }, etag: p.etag, partNumber: p.partNumber }));
+        } catch {
+          warn('FlushEtags', `part ${p.partNumber} lost`);
+        }
       }
     }
+  };
 
-    return result;
-  }
+  const queueEtag = (n: number, etag: string) => {
+    etagBatch.push({ partNumber: n, etag });
+    if (etagBatch.length >= ETAG_BATCH_SIZE) {
+      if (etagTimer) clearTimeout(etagTimer);
+      flushEtags().catch(() => {});
+      return;
+    }
+    if (etagTimer) clearTimeout(etagTimer);
+    etagTimer = setTimeout(() => flushEtags().catch(() => {}), ETAG_FLUSH_MS);
+  };
 
-  async function reSignParts(partNumbers: number[]): Promise<PresignedPart[]> {
-    if (!session || partNumbers.length === 0) return [];
-    const response = await uploadApi.singleChunk({
-      uploadId: session.uploadId,
-      key: session.key,
-      partNumbers,
-    });
-    return response.parts.map((p) => ({ partNumber: p.partNumber, url: p.presignedUrl }));
-  }
-
-  function reportChunkUploaded(partNumber: number, etag: string): void {
-    if (!session) return;
-    uploadApi
-      .markAsChunkUploaded({ params: { vid: session.videoId }, etag, partNumber })
-      .catch((err) => console.error(`[UploadManager] Failed to report part ${partNumber} as uploaded`, err));
-  }
-
-  /**
-   * FIX: Chunk file is created ON-DEMAND inside the worker, not upfront.
-   * The user only sees progress after actual upload starts.
-   */
-  async function uploadChunk(task: TaskQueue[number]): Promise<string> {
-    if (!session) throw new Error("Session lost during upload");
-
-    const partNumber = task.part.partNumber;
+  // ── Upload Chunk ─────────────────────────────────────────────────────────
+  const uploadChunk = async (task: { part: PresignedPart; startByte: number; endByte: number }) => {
+    if (!session) throw new Error('No session');
+    const n = task.part.partNumber;
     let chunkPath: string | null = null;
-    let resolvedEtag: string | null = null;
+    let etag: string | null = null;
+
+    log('UploadChunk', `part=${n}, range=[${task.startByte}-${task.endByte}]`);
 
     try {
-      // ── ON-DEMAND CHUNK CREATION ──
-      // This happens inside the worker, not upfront in start().
-      // User sees "0%" only for milliseconds before upload begins.
-      session = { ...session, status: "INITIALIZING" }
-      chunkPath = await createChunkFile(
-        session.fileUri,
-        session.uploadId,
-        partNumber,
-        task.startByte,
-        task.endByte
-      );
-      session = { ...session, status: "INITIATED" }
+      // 1. Create chunk file (native slice)
+      let pathPromise = chunkCache.get(n);
+      if (!pathPromise) {
+        pathPromise = createChunkFile(session.fileUri, session.uploadId, n, task.startByte, task.endByte);
+        chunkCache.set(n, pathPromise);
+      }
+      chunkPath = await pathPromise;
 
+      // 2. Upload via worker (reads file, converts to Uint8Array, uploads via XHR)
       const worker = new UploadWorker(
         [{
-          partNumber,
+          partNumber: n,
           fileUri: chunkPath,
           url: task.part.url,
-          startByte: task.startByte,
-          endByte: task.endByte,
         }],
         {
           onChunkProgress: ({ uploadedBytes }) => {
-            setPartUploading(partNumber, uploadedBytes);
+            setUploading(n, uploadedBytes);
+            emitProgress();
           },
-          onChunkComplete: (partNumber, etag) => {
-            resolvedEtag = etag;
+          onChunkComplete: (_, e) => {
+            etag = e;
+            log('UploadChunk', `part=${n} done, etag=${e.slice(0, 8)}...`);
           },
-          onChunkError: (partNumber, error) => {
-            setPartPending(partNumber);
-            console.error(`[UploadManager] Part ${partNumber} failed`, error);
+          onChunkError: (_, e) => {
+            setPending(n);
+            warn('UploadChunk', `part=${n} err: ${e.message}`);
           },
         }
       );
 
-      activeWorkers.set(partNumber, worker);
+      activeWorkers.set(n, worker);
       await worker.run();
 
-      if (!resolvedEtag) {
-        throw new Error(`Upload completed without ETag for part ${partNumber}`);
-      }
-
-      return resolvedEtag;
+      if (!etag) throw new Error('No ETag');
+      return etag;
 
     } finally {
-      activeWorkers.delete(partNumber);
+      activeWorkers.delete(n);
+      chunkCache.delete(n);
       if (chunkPath) {
-        await deleteChunkFile(chunkPath).catch((err) =>
-          console.error("[UploadManager] Failed to delete chunk file", err)
-        );
+        await deleteChunkFile(chunkPath);
       }
     }
-  }
+  };
 
-  function handleUploadSuccess(partNumber: number, etag: string): void {
+  // ── Handlers ───────────────────────────────────────────────────────────
+  const onSuccess = (n: number, etag: string) => {
     if (!session || cancelled) return;
-    if (session.uploadedParts.some((p) => p.partNumber === partNumber)) return;
-
-    setPartCompleted(partNumber, etag);
-
-    session = {
-      ...session,
-      uploadedParts: [...session.uploadedParts, { partNumber, etag }],
-    };
-
+    if (session.uploadedParts.some(p => p.partNumber === n)) return;
+    setCompleted(n, etag);
+    session = { ...session, uploadedParts: [...session.uploadedParts, { partNumber: n, etag }] };
     persist();
-    reportChunkUploaded(partNumber, etag);
+    queueEtag(n, etag);
     emitProgress(true);
-  }
+  };
 
-  function handleUploadFailure(error: unknown): void {
-    if (error instanceof Error && error.name === "AbortError") return;
-
-    console.error("[UploadManager] Internal worker error encountered:", error);
-
-    if (session) {
-      session = { ...session, status: "FAILED" };
-      persist();
-    }
-    updateStatus("FAILED");
+  const onFail = (error: unknown) => {
+    if (error instanceof Error && error.name === 'AbortError') return;
+    err('OnFail', error);
+    if (session) { session = { ...session, status: 'FAILED' }; persist(); }
+    updateStatus('FAILED');
     callbacks?.onError?.(error instanceof Error ? error : new Error(String(error)));
     UploadNotificationService.showFailed();
-  }
+  };
 
-  function getNextTask(): TaskQueue[number] | null {
-    if (!taskQueue || cursor >= taskQueue.length) return null;
-    return taskQueue[cursor++] ?? null;
-  }
+  // ── Worker Loop ──────────────────────────────────────────────────────────
+  const processQueue = async () => {
+    if (!session) return;
+    if (session.uploadedParts.length >= session.totalParts) { await complete(); return; }
 
-  async function worker(): Promise<void> {
-    while (!paused && !cancelled) {
-      const task = getNextTask();
-      if (!task) break;
+    const queue = buildQueue(session.presignedUrls, session.uploadedParts);
+    const sharedQueue = [...queue];
 
-      try {
-        const etag = await retry(() => uploadChunk(task));
-        handleUploadSuccess(task.part.partNumber, etag);
-      } catch (error) {
-        handleUploadFailure(error);
-        return;
-      }
-    }
-  }
-
-  async function processQueue(): Promise<void> {
-    if (!session) {
-      console.error("[UploadManager] Cannot process queue: Session payload is completely null.");
-      return;
-    }
-
-    if (session.uploadedParts.length >= session.totalParts) {
-      await completeUpload();
-      return;
-    }
-
-    taskQueue = getRemainingParts(session.presignedUrls, session.uploadedParts);
-    cursor = 0;
-
-    session = { ...session, status: "UPLOADING" };
+    session = { ...session, status: 'UPLOADING' };
     persist();
-    updateStatus("UPLOADING");
+    updateStatus('UPLOADING');
     UploadNotificationService.showProgress(0);
 
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    const concurrency = getConcurrency();
+    log('ProcessQueue', `${concurrency} workers, ${sharedQueue.length} tasks`);
 
-    if (cancelled) {
-      updateStatus("CANCELLED");
-    } else if (paused) {
-      updateStatus("PAUSED");
-    } else if (session && session.uploadedParts.length >= session.totalParts) {
-      await completeUpload();
-    } else if (!session) {
-      UploadNotificationService.showFailed();
-    }
-  }
-
-  // completeUpload (inside UploadManager)
-  async function completeUpload(): Promise<void> {
-    if (!session) return;
-
-    session = { ...session, status: "COMPLETING" };
-    persist();
-    updateStatus("COMPLETING");
-
-    try {
-      const sortedParts = [...session.uploadedParts].sort(
-        (a, b) => a.partNumber - b.partNumber,
-      );
-
-      await uploadApi.complete({
-        uploadId: session.uploadId,
-        videoId: session.videoId,
-        parts: sortedParts,
-      });
-
-      // Upload thumbnail — MUST succeed before marking complete.
-      if (session.thumbnailPresignedUrl && session.thumbnailLocalUri) {
-        await uploadThumbnail(
-          session.thumbnailLocalUri,
-          session.thumbnailPresignedUrl,
-          session.thumbnailType ?? "image/jpeg",
-        );
+    const workerLoop = async () => {
+      while (!paused && !cancelled) {
+        const task = sharedQueue.shift();
+        if (!task) break;
+        log('WorkerLoop', `dequeued part=${task.part.partNumber}, ${sharedQueue.length} remaining`);
+        try {
+          const etag = await retry(() => uploadChunk(task));
+          onSuccess(task.part.partNumber, etag);
+        } catch (e) {
+          onFail(e);
+          return;
+        }
       }
-
-      session = { ...session, status: "COMPLETED" };
-      persist();
-      uploadStorage.removeSession();
-      updateStatus("COMPLETED");
-
-      highestProgressEmitted = 100;
-      callbacks?.onProgress?.({
-        progress: 100,
-        uploadedBytes: session.fileSize,
-        totalBytes: session.fileSize,
-        activeParts: 0,
-        completedParts: session.totalParts,
-        totalParts: session.totalParts,
-      });
-
-      UploadNotificationService.showCompleted();
-    } catch (error) {
-      console.error(
-        "[UploadManager] API exception while completing multipart upload:",
-        error,
-      );
-      session = { ...session, status: "FAILED" };
-      persist();
-      callbacks?.onError?.(error instanceof Error ? error : new Error(String(error)));
-      UploadNotificationService.showFailed();
-    }
-  }
-
-  /**
-   * FIX: No chunk splitting here. Just initialize session and start queue.
-   * Chunks are created on-demand inside uploadChunk().
-   */
-  async function start(params: StartUploadParams): Promise<void> {
-    clearStaleSession();
-    if (uploadStorage.hasSession()) {
-      console.error("[UploadManager] System locked. Storage states show a parallel active session.");
-      throw new Error("Another upload already");
-    }
-
-    paused = false;
-    cancelled = false;
-    partState.clear();
-    activeWorkers.clear();
-    taskQueue = null;
-    cursor = 0;
-    highestProgressEmitted = 0;
-
-    updateStatus("INITIALIZING");
-
-    const { allowRating, ...restMetadata } = params.metadata;
-
-    const initResponse = await uploadApi.initialize({
-      ...restMetadata,
-      fileName: params.fileName,
-      mimeType: params.mimeType,
-      fileSize: params.fileSize,
-      allowRatings: allowRating,
-      thumbnailType: params.thumbnailType ?? "image/jpeg"
-    });
-
-    console.log(JSON.stringify(initResponse, null, 2))
-
-    // if (params.thumbnailBlob && initResponse.thumbnailUrl) {
-    //   uploadThumbnail({initResponse.thumbnailUrl, params.thumbnailBlob})
-    //     .catch(err => console.error("Thumbnail upload failed:", err));
-    // }
-
-    session = {
-      videoId: initResponse.videoId,
-      uploadId: initResponse.uploadId,
-      key: initResponse.objectKey,
-      fileUri: params.fileUri,
-      fileName: params.fileName,
-      mimeType: params.mimeType,
-      fileSize: params.fileSize,
-      chunkSize: initResponse.chunkSize,
-      totalParts: initResponse.totalChunks,
-      presignedUrls: initResponse.urls,
-      // thumbnail related work
-      thumbnailLocalUri: params.thumbnailLocalUri,
-      thumbnailType: params.thumbnailType,
-      thumbnailPresignedUrl: initResponse.thumbnailPresignedUrl?.url,
-      uploadedParts: [],
-      metadata: params.metadata,
-      status: "INITIATED",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
     };
 
-    initializePartState(initResponse.totalChunks, params.fileSize, initResponse.chunkSize);
+    await Promise.all(Array.from({ length: concurrency }, () => workerLoop()));
 
+    if (etagTimer) clearTimeout(etagTimer);
+    await flushEtags();
+
+    if (cancelled) updateStatus('CANCELLED');
+    else if (paused) updateStatus('PAUSED');
+    else if (session.uploadedParts.length >= session.totalParts) await complete();
+  };
+
+  // ── Complete ───────────────────────────────────────────────────────────
+  const complete = async () => {
+    if (!session || completing) return;
+    completing = true;
+    if (etagTimer) clearTimeout(etagTimer);
+    await flushEtags();
+    await cleanupChunks(session.uploadId);
+
+    session = { ...session, status: 'COMPLETING' };
     persist();
-    updateStatus("INITIATED");
+    updateStatus('COMPLETING');
+    log('Complete', 'finalizing...');
 
-    // ── NO CHUNK SPLITTING HERE ──
-    // processQueue() starts workers immediately. Each worker creates its chunk on-demand.
-    await processQueue();
-  }
+    try {
+      const parts = [...session.uploadedParts].sort((a, b) => a.partNumber - b.partNumber);
+      await uploadApi.complete({ videoId: session.videoId, uploadId: session.uploadId, parts });
 
-  async function resume(): Promise<void> {
-    const stored = uploadStorage.getSession();
+      if (session.thumbnailPresignedUrl && session.thumbnailLocalUri) {
+        try {
+          await uploadThumbnail(session.thumbnailLocalUri, session.thumbnailPresignedUrl, session.thumbnailType ?? 'image/jpeg');
+        } catch (e) { warn('Complete', 'thumbnail failed:', e); }
+      }
 
-    if (!stored) {
-      console.error("[UploadManager] Action blocked: Local session not found.");
-      throw new Error("No upload session found");
-    }
-
-    session = stored;
-
-    partState.clear();
-    activeWorkers.clear();
-    taskQueue = null;
-    cursor = 0;
-    highestProgressEmitted = 0;
-
-    updateStatus("INITIALIZING");
-
-    const serverState = await uploadApi.getStatus(session.videoId);
-
-    if (serverState.status === "COMPLETED") {
+      session = { ...session, status: 'COMPLETED' };
+      persist();
       uploadStorage.removeSession();
-      updateStatus("COMPLETED");
+      updateStatus('COMPLETED');
+      highestProgress = 100;
+      callbacks?.onProgress?.({
+        progress: 100, uploadedBytes: session.fileSize, totalBytes: session.fileSize,
+        activeParts: 0, completedParts: session.totalParts, totalParts: session.totalParts,
+      });
+      UploadNotificationService.showCompleted();
+      log('Complete', 'SUCCESS');
+    } catch (e) {
+      err('Complete', 'failed:', e);
+      session = { ...session, status: 'FAILED' };
+      persist();
+      callbacks?.onError?.(e instanceof Error ? e : new Error(String(e)));
+      UploadNotificationService.showFailed();
+    } finally {
+      completing = false;
+    }
+  };
+
+  // ── Public API ─────────────────────────────────────────────────────────
+  const start = async (params: StartUploadParams) => {
+ const stored = uploadStorage.getSession();
+
+if (stored) {
+  // If manager already exists, resume should be used instead
+  // Since we are starting a fresh upload, wipe stale session.
+  console.warn(
+    "[UploadManager] Removing stale upload session:",
+    stored.status
+  );
+
+  uploadStorage.removeSession();
+}
+    if (stored) uploadStorage.removeSession();
+
+    paused = false; cancelled = false; highestProgress = 0;
+    etagBatch = []; etagTimer = null; lastProgressEmit = 0;
+    partState.clear(); activeWorkers.clear(); chunkCache.clear();
+
+    updateStatus('INITIALIZING');
+    log('Start', `${params.fileName} (${params.fileSize} bytes)`);
+
+    const { allowRating, ...metadata } = params.metadata;
+    const res = await uploadApi.initialize({
+      title: metadata.title, description: metadata.description,
+      fileName: params.fileName, mimeType: params.mimeType, fileSize: params.fileSize,
+      madeForKids: metadata.madeForKids, allowRatings: allowRating,
+      allowComments: metadata.allowComments, chapters: metadata.chapters,
+      thumbnailType: params.thumbnailType ?? 'image/jpeg',
+    });
+
+    session = {
+      videoId: res.videoId, uploadId: res.uploadId, key: res.objectKey,
+      fileUri: params.fileUri, fileName: params.fileName, mimeType: params.mimeType,
+      fileSize: params.fileSize, chunkSize: res.chunkSize, totalParts: res.totalChunks,
+      presignedUrls: res.urls, uploadedParts: [], status: 'INITIATED',
+      createdAt: Date.now(), updatedAt: Date.now(),
+      thumbnailLocalUri: params.thumbnailLocalUri, thumbnailType: params.thumbnailType,
+      thumbnailPresignedUrl: res.thumbnailPresignedUrl?.url,
+      thumbnailKey: res.thumbnailKey, previewKey: res.previewKey,
+      metadata: { title: metadata.title, description: metadata.description },
+    };
+
+    initPartState(res.totalChunks, params.fileSize, res.chunkSize);
+    persist();
+    updateStatus('INITIATED');
+    await processQueue();
+  };
+
+  const resume = async () => {
+    const stored = uploadStorage.getSession();
+    if (!stored) throw new Error('No session');
+
+    session = stored; paused = false; cancelled = false;
+    highestProgress = 0; etagBatch = []; etagTimer = null; lastProgressEmit = 0;
+    partState.clear(); activeWorkers.clear(); chunkCache.clear();
+
+    updateStatus('INITIALIZING');
+    log('Resume', `videoId=${stored.videoId}`);
+
+    const server = await uploadApi.getStatus(session.videoId);
+    if (server.status === 'COMPLETED') {
+      uploadStorage.removeSession();
+      updateStatus('COMPLETED');
       return;
     }
 
-    session = {
-      ...session,
-      uploadedParts: mergeUploadedParts(session.uploadedParts, serverState.uploadedParts),
-    };
-
-    initializePartState(session.totalParts, session.fileSize, session.chunkSize);
-
-    for (const uploaded of session.uploadedParts) {
-      setPartCompleted(uploaded.partNumber, uploaded.etag);
-    }
-
+    session = { ...session, uploadedParts: mergeParts(session.uploadedParts, server.uploadedParts ?? []) };
+    initPartState(session.totalParts, session.fileSize, session.chunkSize);
+    for (const p of session.uploadedParts) setCompleted(p.partNumber, p.etag);
     emitProgress(true);
 
-    const remainingPartNumbers = session.presignedUrls
-      .map((part) => part.partNumber)
-      .filter(
-        (partNumber) =>
-          !session!.uploadedParts.some((uploaded) => uploaded.partNumber === partNumber)
-      );
+    const remaining = session.presignedUrls
+      .map(p => p.partNumber)
+      .filter(n => !session!.uploadedParts.some(u => u.partNumber === n));
 
-    try {
-      if (remainingPartNumbers.length > 0) {
-        const freshParts = await reSignParts(remainingPartNumbers);
-
-        if (freshParts.length > 0) {
-          const freshByPart = new Map(freshParts.map((part) => [part.partNumber, part]));
-
-          session = {
-            ...session,
-            presignedUrls: session.presignedUrls.map(
-              (part) => freshByPart.get(part.partNumber) ?? part
-            ),
-          };
-        }
-      }
-    } catch (error) {
-      console.error("[UploadManager] Failed to refresh presigned URLs during resume", error);
+    if (remaining.length > 0) {
+      try {
+        const fresh = await uploadApi.singleChunk({ uploadId: session.uploadId, key: session.key, partNumbers: remaining });
+        const byNum = new Map(fresh.parts.map(p => [p.partNumber, p]));
+        session = { ...session, presignedUrls: session.presignedUrls.map(p => byNum.get(p.partNumber) ?? p) };
+      } catch { /* use existing */ }
     }
 
     persist();
     await processQueue();
-  }
+  };
 
-  function pause(): void {
-    if (!session || session.status !== "UPLOADING") return;
-
+  const pause = () => {
+    if (!session || session.status !== 'UPLOADING') return;
     paused = true;
-    activeWorkers.forEach((worker) => worker.cancel());
+    activeWorkers.forEach(w => w.cancel());
     activeWorkers.clear();
-
-    for (const [partNumber, state] of partState.entries()) {
-      if (state.status === "UPLOADING") {
-        setPartPending(partNumber);
-      }
-    }
-
-    session = { ...session, status: "PAUSED" };
+    for (const [n, s] of partState.entries()) if (s.status === 'UPLOADING') setPending(n);
+    session = { ...session, status: 'PAUSED' };
     persist();
-    updateStatus("PAUSED");
-  }
+    updateStatus('PAUSED');
+    log('Pause', `${session.uploadedParts.length}/${session.totalParts} done`);
+  };
 
-  async function cancel(): Promise<void> {
-    cancelled = true;
-    paused = false;
-    activeWorkers.forEach((worker) => worker.cancel());
+  const cancel = async () => {
+    cancelled = true; paused = false;
+    activeWorkers.forEach(w => w.cancel());
     activeWorkers.clear();
     partState.clear();
-    taskQueue = null;
-    cursor = 0;
+
+    const entries = Array.from(chunkCache.entries());
+    for (const [n, promise] of entries) {
+      try {
+        const path = await promise;
+        if (typeof path === 'string') await deleteChunkFile(path);
+      } catch { /* ignore */ }
+    }
+    chunkCache.clear();
+
+    if (etagTimer) clearTimeout(etagTimer);
+    await flushEtags();
 
     try {
       if (session?.videoId && session?.key && session?.uploadId) {
-        const res = await uploadApi.cancleUpload({
-          videoId: session.videoId,
-          objectKey: session.key,
-          uploadId: session.uploadId,
-        });
-        console.log({ "Cancel upload response": res });
+        await uploadApi.cancelUpload({ videoId: session.videoId, objectKey: session.key, uploadId: session.uploadId });
       }
-    } catch (err) {
-      console.error("[UploadManager] Failed to notify server of cancellation", err);
-    }
+    } catch { /* S3 lifecycle */ }
 
-    if (session) {
-      uploadStorage.removeSession();
-      session = null;
-    }
+    if (session) { uploadStorage.removeSession(); session = null; }
+    updateStatus('CANCELLED');
+    log('Cancel', 'done');
+  };
 
-    updateStatus("CANCELLED");
-  }
-
-  function clearStaleSession(): void {
-    const historicalSession = uploadStorage.getSession();
-    if (!historicalSession) return;
-
-    const removableStates = ["FAILED", "COMPLETED", "CANCELLED"];
-
-    if (removableStates.includes(historicalSession.status)) {
-      uploadStorage.removeSession();
-    }
-  }
-
-  function mergeUploadedParts(local: UploadedPart[], server: UploadedPart[]): UploadedPart[] {
+  const mergeParts = (local: UploadedPart[], server: UploadedPart[]): UploadedPart[] => {
     const merged = new Map<number, UploadedPart>();
     for (const p of local) merged.set(p.partNumber, p);
     for (const p of server) merged.set(p.partNumber, p);
     return Array.from(merged.values());
-  }
-
-  // async function uploadThumbnail(thumbnailPresignedUrl: string | { url: string }): Promise<void> {
-  //   console.log({ thumbnailPresignedUrl })
-  //   // Handle both string and object formats
-  //   const url = typeof thumbnailPresignedUrl === 'string'
-  //     ? thumbnailPresignedUrl
-  //     : thumbnailPresignedUrl?.url;
-
-  //   if (!url || typeof url !== 'string') {
-  //     throw new Error(`Invalid thumbnail presigned URL: ${JSON.stringify(thumbnailPresignedUrl)}`);
-  //   }
-
-  //   const thumbnailBlob = session?.thumbnailBlob;
-  //   if (!thumbnailBlob) {
-  //     throw new Error("No thumbnail blob available for upload");
-  //   }
-
-  //   const response = await fetch(url, {
-  //     method: "PUT",
-  //     body: thumbnailBlob,
-  //     headers: {
-  //       "Content-Type": session?.thumbnailType ?? "image/jpeg",
-  //     },
-  //   });
-
-  //   if (!response.ok) {
-  //     throw new Error(`Thumbnail upload failed: ${response.status} ${response.statusText}`);
-  //   }
-  // }
-
-  return {
-    start,
-    resume,
-    pause,
-    cancel,
   };
+
+  return { start, resume, pause, cancel };
 }

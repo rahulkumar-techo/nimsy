@@ -86,10 +86,7 @@ export function useUploadForm(video: SelectedVideo | null) {
 
         Alert.alert("Upload Started", "Your upload has started.");
       } catch (err) {
-        Alert.alert(
-          "Upload Failed",
-          err instanceof Error ? err.message : "Unknown error",
-        );
+        console.error("[UploadForm]", err);
       }
     },
     [video, visibility, startUpload, thumbnailUri],
