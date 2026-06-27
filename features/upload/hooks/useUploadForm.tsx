@@ -44,6 +44,7 @@ export function useUploadForm(video: SelectedVideo | null) {
   useEffect(() => {
     if (uploadState.status === "COMPLETED") {
       form.reset(DEFAULT_VALUES);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisibility("PUBLIC");
     }
   }, [uploadState.status, form]);

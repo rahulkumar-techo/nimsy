@@ -22,13 +22,47 @@ const LETTERS = [
   { char: "Y", color: "text-purple-500" },
 ];
 
+const AnimatedLetter = ({
+  item,
+  index,
+}: {
+  item: (typeof LETTERS)[0];
+  index: number;
+}) => {
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withDelay(
+      index * 150,
+      withRepeat(
+        withSequence(
+          withTiming(-12, { duration: 250 }),
+          withTiming(0, { duration: 250 }),
+        ),
+        -1,
+        true,
+      ),
+    );
+  }, [index, translateY]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <AnimatedText
+      style={[style]}
+      className={`text-[40px] font-black mx-1.5 ${item.color}`}
+    >
+      {item.char}
+    </AnimatedText>
+  );
+};
+
 export default function NimsyLoadingScreen() {
   const logoTranslateX = useSharedValue(-80);
 
-  const letterAnimations = LETTERS.map(() => useSharedValue(0));
-
   useEffect(() => {
-    // Sliding Logo
     logoTranslateX.value = withRepeat(
       withSequence(
         withTiming(width - 170, {
@@ -37,39 +71,19 @@ export default function NimsyLoadingScreen() {
         }),
         withTiming(-80, {
           duration: 0,
-        })
+        }),
       ),
       -1,
-      false
+      false,
     );
-
-    // Bouncing Letters
-    letterAnimations.forEach((anim, index) => {
-      anim.value = withDelay(
-        index * 150,
-        withRepeat(
-          withSequence(
-            withTiming(-12, { duration: 250 }),
-            withTiming(0, { duration: 250 })
-          ),
-          -1,
-          true
-        )
-      );
-    });
-  }, []);
+  }, [logoTranslateX]);
 
   const logoStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        translateX: logoTranslateX.value,
-      },
-    ],
+    transform: [{ translateX: logoTranslateX.value }],
   }));
 
   return (
     <View className="flex-1 bg-white items-center justify-center px-5">
-      {/* Portrait Image */}
       <View className="mb-10 items-center">
         <Image
           source={require("../../assets/app-loading/nimsy-loading-app.png")}
@@ -78,9 +92,7 @@ export default function NimsyLoadingScreen() {
         />
       </View>
 
-      {/* Loading Animation Track */}
       <View className="w-[88%] h-[90px] rounded-[28px] bg-[#FFF8EE] justify-center overflow-hidden shadow-lg shadow-black/10 elevation-5">
-        {/* Sliding Logo */}
         <Animated.View
           style={[logoStyle]}
           className="absolute left-0 w-[60px] h-[60px] rounded-[18px] bg-violet-600 justify-center items-center"
@@ -88,31 +100,13 @@ export default function NimsyLoadingScreen() {
           <Text className="text-white text-[34px] font-black">N</Text>
         </Animated.View>
 
-        {/* Bouncing Letters */}
         <View className="flex-row justify-center items-center">
-          {LETTERS.map((item, index) => {
-            const style = useAnimatedStyle(() => ({
-              transform: [
-                {
-                  translateY: letterAnimations[index].value,
-                },
-              ],
-            }));
-
-            return (
-              <AnimatedText
-                key={item.char}
-                style={[style]}
-                className={`text-[40px] font-black mx-1.5 ${item.color}`}
-              >
-                {item.char}
-              </AnimatedText>
-            );
-          })}
+          {LETTERS.map((item, index) => (
+            <AnimatedLetter key={item.char} item={item} index={index} />
+          ))}
         </View>
       </View>
 
-      {/* Loading Text */}
       <Text className="mt-6 text-gray-400 text-sm font-medium tracking-widest uppercase">
         Loading
       </Text>

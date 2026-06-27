@@ -1,9 +1,6 @@
 import { Redirect } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
 import NimsyLoadingScreen from "@/components/loader/NimsyLoadingScreen";
 
 export default function Index() {
@@ -13,7 +10,6 @@ export default function Index() {
     isOnboardingReady,
   } = useAuth();
 
-  const { colors } = useTheme();
 
   console.log({
     user,

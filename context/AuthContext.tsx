@@ -77,7 +77,7 @@ export const AuthProvider = ({
         if (accessToken) {
           await refreshUser();
         }
-      } catch (error) {
+      } catch {
       } finally {
         setIsOnboardingReady(true);
         await SplashScreen.hideAsync();
