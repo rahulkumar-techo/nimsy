@@ -49,10 +49,15 @@ export function useUpload() {
   }), [dispatch, handleProgress, resetUI]);
 
   const runInit = useCallback(async (action: (mgr: NonNullable<typeof globalManager>) => Promise<void>, shouldReset = false) => {
-    if (isStarting || globalManager) return console.warn(`[useUpload] Action blocked. Starting: ${isStarting}, Running: ${!!globalManager}`);
+    if (isStarting || globalManager) {
+      console.warn(`[useUpload] Action blocked. Starting: ${isStarting}, Running: ${!!globalManager}`);
+      return;
+    }
+
     isStarting = true;
-    shouldReset ? resetUI() : dispatch(setError(null));
+    if (shouldReset) resetUI(); else dispatch(setError(null));
     dispatch(setStatus("INITIALIZING"));
+
     try {
       globalManager = createManager();
       await action(globalManager);
@@ -71,8 +76,8 @@ export function useUpload() {
   const pauseUpload = useCallback(() => globalManager ? globalManager.pause() : console.warn("[useUpload] No upload to pause"), []);
 
   const cancelUpload = useCallback(async () => {
-    try { globalManager && await globalManager.cancel(); } 
-    catch (err) { console.warn("[useUpload] Failed to cancel", err); } 
+    try { globalManager && await globalManager.cancel(); }
+    catch (err) { console.warn("[useUpload] Failed to cancel", err); }
     finally {
       clearManager();
       resetUI();
@@ -80,7 +85,7 @@ export function useUpload() {
     }
   }, [dispatch, resetUI]);
 
-  useEffect(() => {}, []); // Allows background execution on unmount
+  useEffect(() => { }, []); // Allows background execution on unmount
 
   return {
     startUpload, resumeUpload, pauseUpload, cancelUpload,

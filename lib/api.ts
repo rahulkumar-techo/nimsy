@@ -2,6 +2,7 @@ import { AUTH_ENDPOINTS } from "@/constants/auth.constants";
 import { authStorage } from "@/features/auth/utils/auth-storage";
 import axios, { AxiosInstance, InternalAxiosRequestConfig, create } from "axios";
 
+// const API_BASE_URL = "http://192.168.43.13:5000/api/v1";
 const API_BASE_URL = "http://10.161.161.170:5000/api/v1";
 
 const axiosInstance: AxiosInstance = create({

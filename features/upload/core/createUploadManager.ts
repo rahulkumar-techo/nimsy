@@ -26,9 +26,10 @@ import {
 } from '../types/upload.types';
 import { ChunkIntegrity } from '../utils/chunk/chunk-integrity.util';
 import { uploadThumbnail } from '../utils/uploadThumbnail';
-import { ConcurrencyController } from './manager/concurrency.controller';
+import { ConcurrencyController } from './manager/concurrency';
 import { PersistController } from './manager/persist';
 
+import NetInfo from "@react-native-community/netinfo";
 // ═══════════════════════════════════════════════════════════════════════════════
 // DEBUG
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -41,46 +42,96 @@ const err = (s: string, ...a: unknown[]) => { console.error(`[UM][${s}]`, ...a);
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════════════════
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000] as const;
-const CONCURRENCY = { BASE: 3, LOW_END: 2 };
+// const CONCURRENCY = { BASE: 3, LOW_END: 2 };
 const ETAG_BATCH_SIZE = 5;
 const ETAG_FLUSH_MS = 2000;
 const PROGRESS_THROTTLE_MS = 200;
-
+let cancelled = false;
 
 
 const CHUNK_CACHE_DIR = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload-chunks/`;
 
-function getConcurrency(): number {
-  try {
-    const mem = (global as any).performance?.memory?.usedJSHeapSize;
-    if (mem && mem < 100 * 1024 * 1024) return CONCURRENCY.LOW_END;
-  } catch { /* ignore */ }
-  return CONCURRENCY.BASE;
-}
+// function getConcurrency(): number {
+//   try {
+//     const mem = (global as any).performance?.memory?.usedJSHeapSize;
+//     if (mem && mem < 100 * 1024 * 1024) return CONCURRENCY.LOW_END;
+//   } catch { /* ignore */ }
+//   return CONCURRENCY.BASE;
+// }
 
 function isRetryable(error: unknown): boolean {
-  if (error instanceof Error) {
-    return /timeout|network|econn|etimedout|abort|reset/i.test(error.message);
-  }
-  if (error && typeof error === 'object' && 'response' in error) {
-    return (error as any).response?.status >= 500;
-  }
-  return false;
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error).toLowerCase();
+
+  return [
+    "timeout",
+    "network",
+    "econn",
+    "etimedout",
+    "abort",
+    "reset",
+    "unable to resolve host",
+    "failed to connect",
+    "software caused connection abort",
+    "no address associated with hostname",
+    "socket closed",
+    "connection refused",
+  ].some(pattern => message.includes(pattern));
 }
 
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+// const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
-async function retry<T>(op: () => Promise<T>, attempt = 0): Promise<T> {
-  try {
-    return await op();
-  } catch (e) {
-    if (attempt >= BACKOFF_MS.length || !isRetryable(e)) throw e;
-    const delay = BACKOFF_MS[attempt] ?? BACKOFF_MS.at(-1)!;
-    log('Retry', `attempt=${attempt + 1}, delay=${delay}ms, err=${(e as Error).message}`);
-    await sleep(delay);
-    return retry(op, attempt + 1);
-  }
+
+async function cancellableSleep(ms: number) {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+
+    const interval = setInterval(() => {
+      if (cancelled) {
+        clearTimeout(timer);
+        clearInterval(interval);
+        reject(new Error("UploadCancelled"));
+      }
+    }, 100);
+  });
 }
+
+const retry = async <T>(fn: () => Promise<T>): Promise<T> => {
+  let attempt = 0;
+
+  while (attempt < BACKOFF_MS.length) {
+    if (cancelled) {
+      throw new Error("UploadCancelled");
+    }
+
+    try {
+      return await fn();
+    } catch (error) {
+      if (cancelled) {
+        throw new Error("UploadCancelled");
+      }
+
+      if (!isRetryable(error)) {
+        throw error;
+      }
+
+      const delay = BACKOFF_MS[attempt] + Math.random() * 1000;
+
+      log("Retry", `attempt=${attempt + 1}, delay=${delay}ms`);
+
+      await cancellableSleep(delay);
+
+      attempt++;
+    }
+  }
+
+  throw new Error("Retry limit exceeded");
+};
+
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHUNK UTILITIES
@@ -143,7 +194,7 @@ async function cleanupChunks(uploadId: string): Promise<void> {
 export function createUploadManager(callbacks?: UploadCallbacks) {
   let session: UploadSession | null = null;
   let paused = false;
-  let cancelled = false;
+
 
   const activeWorkers = new Map<number, UploadWorker>();
   const partState = new Map<number,
@@ -155,13 +206,14 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   const chunkCache = new Map<number, Promise<string>>();
   const persistController = new PersistController({ intervalMs: 5000, batchSize: 5, });
 
-
+  let uploadStarted = false;
 
   let highestProgress = 0;
   let etagBatch: UploadedPart[] = [];
   let etagTimer: ReturnType<typeof setTimeout> | null = null;
   let completing = false;
   let lastProgressEmit = 0;
+  let unsubscribeNetInfo: (() => void) | null = null;
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   /* const persist = () => {
@@ -170,6 +222,20 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
      uploadStorage.saveSession(session);
      log('Persist', `${session.status} | ${session.uploadedParts.length}/${session.totalParts}`);
    };*/
+
+  const setupNetworkListener = () => {
+    unsubscribeNetInfo?.();
+
+    unsubscribeNetInfo = NetInfo.addEventListener(state => {
+      if (
+        state.isConnected &&
+        session?.status === "WAITING_FOR_NETWORK"
+      ) {
+        log("Network", "Connection restored. Resuming...");
+        resume().catch(onFail);
+      }
+    });
+  };
 
   const updateStatus = (s: UploadStatus) => {
     log('Status', s);
@@ -198,14 +264,23 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
   const emitProgress = (force = false) => {
     if (!session) return;
+
     const now = Date.now();
-    if (!force && now - lastProgressEmit < PROGRESS_THROTTLE_MS) return;
+
+    if (!force && now - lastProgressEmit < PROGRESS_THROTTLE_MS) {
+      return;
+    }
+
     lastProgressEmit = now;
-    const { progress } = calcProgress();
-    const clamped = Math.max(progress, highestProgress);
-    if (!force && clamped === highestProgress) return;
-    highestProgress = clamped;
-    callbacks?.onProgress?.({ ...calcProgress(), progress: clamped });
+
+    const update = calcProgress();
+
+    highestProgress = Math.max(highestProgress, update.progress);
+
+    callbacks?.onProgress?.({
+      ...update,
+      progress: highestProgress,
+    });
   };
 
   /**
@@ -300,6 +375,9 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   // ── ETag Reporting ───────────────────────────────────────────────────────
   const flushEtags = async () => {
     if (!session || etagBatch.length === 0) return;
+
+
+
     const batch = [...etagBatch];
     etagBatch = [];
     log('FlushEtags', `${batch.length} ETags`);
@@ -309,9 +387,17 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     } catch {
       warn('FlushEtags', 'batch failed, fallback');
       for (const p of batch) {
+        if (cancelled) {
+          warn("FlushEtags", "Upload cancelled. Stopping ETag flush.");
+          return;
+        }
         try {
+
           await retry(() => uploadApi.markAsChunkUploaded({ params: { vid: session!.videoId }, etag: p.etag, partNumber: p.partNumber }));
         } catch {
+          if (cancelled) {
+            return;
+          }
           warn('FlushEtags', `part ${p.partNumber} lost`);
         }
       }
@@ -366,6 +452,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
         throw error;
       } finally {
         activeWorkers.delete(partNumber);
+        emitProgress(true);
         if (chunkPath && (uploadSucceeded || attempt === 1)) {
           chunkCache.delete(partNumber);
           await deleteChunkFile(chunkPath);
@@ -387,46 +474,111 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     queueEtag(n, etag);
     emitProgress(true);
   };
+  // single biggest improvement for resumable uploads.
+  const isNetworkFailure = (error: unknown) => {
+    const msg =
+      error instanceof Error
+        ? error.message.toLowerCase()
+        : String(error).toLowerCase();
+
+    return [
+      "unable to resolve host",
+      "failed to connect",
+      "network",
+      "connection abort",
+      "socket",
+    ].some(p => msg.includes(p));
+  };
 
   const onFail = (error: unknown) => {
-    if (error instanceof Error && error.name === 'AbortError') return;
-    err('OnFail', error);
-    if (session) {
-      session = { ...session, status: 'FAILED' };
-      // force -> because a brand new session must always be saved immediately.
-      persistController.persist(session, true);
+    if (error instanceof Error && error.name === "AbortError"
+      || (error as any).message === "UploadCancelled") return;
+
+    err("OnFail", error);
+
+    const e = error instanceof Error ? error : new Error(String(error));
+    if (!session) {
+      callbacks?.onError?.(e);
+      return;
     }
-    updateStatus('FAILED');
-    callbacks?.onError?.(error instanceof Error ? error : new Error(String(error)));
-    UploadNotificationService.showFailed();
+
+    const isNet = isNetworkFailure(error);
+    session = { ...session, status: isNet ? "WAITING_FOR_NETWORK" : "FAILED" };
+    persistController.persist(session, true);
+    updateStatus(session.status);
+    callbacks?.onError?.(e);
+
+    if (!isNet) UploadNotificationService.showFailed();
   };
 
   // ── Worker Loop ──────────────────────────────────────────────────────────
   const processQueue = async () => {
+    if (!session) return;
     const concurrency = await ConcurrencyController.getOptimal();
 
-    if (!session) return;
+    // ensures the offline state survives app restarts.
+    if (concurrency.workers === 0) {
+      session = {
+        ...session,
+        status: "WAITING_FOR_NETWORK",
+      };
+
+      persistController.persist(session);
+      updateStatus("WAITING_FOR_NETWORK");
+      return;
+    }
+
     if (session.uploadedParts.length >= session.totalParts) { await complete(); return; }
 
     const queue = buildQueue(session.presignedUrls, session.uploadedParts);
     const sharedQueue = [...queue];
+    // prevents the upload from switching back to UPLOADING after the user has already paused or cancelled
+    if (paused || cancelled) {
+      return;
+    }
+    session = {
+      ...session,
+      status: "PREPARING_UPLOAD",
+    };
 
-    session = { ...session, status: 'UPLOADING' };
     persistController.persist(session);
-    updateStatus('UPLOADING');
+    updateStatus("PREPARING_UPLOAD");
     UploadNotificationService.showProgress(0);
 
     // const concurrency = getConcurrency();
     log('ProcessQueue', `${concurrency.workers} workers, ${sharedQueue.length} tasks reason ${concurrency.reason}`);
 
+
     const workerLoop = async () => {
       while (!paused && !cancelled) {
         const task = sharedQueue.shift();
         if (!task) break;
-        log('WorkerLoop', `dequeued part=${task.part.partNumber}, ${sharedQueue.length} remaining`);
+
+        log(
+          "WorkerLoop",
+          `dequeued part=${task.part.partNumber}, ${sharedQueue.length} remaining`
+        );
+
         try {
-          const etag = await retry(() => uploadChunk(task));
-          onSuccess(task.part.partNumber, etag!);
+          const etag = await retry(async () => {
+            // First task about to begin processing
+            if (!uploadStarted && session) {
+              uploadStarted = true;
+
+              session = {
+                ...session,
+                status: "UPLOADING",
+              };
+
+              persistController.persist(session);
+              updateStatus("UPLOADING");
+              UploadNotificationService.showProgress(0);
+            }
+
+            return uploadChunk(task);
+          });
+
+          onSuccess(task.part.partNumber, etag);
         } catch (e) {
           onFail(e);
           return;
@@ -436,12 +588,22 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
     await Promise.all(Array.from({ length: concurrency.workers }, () => workerLoop()));
 
+    // Guard against session becoming null
+    if (!session) return;
     if (etagTimer) clearTimeout(etagTimer);
     await flushEtags();
-
-    if (cancelled) updateStatus('CANCELLED');
-    else if (paused) updateStatus('PAUSED');
-    else if (session.uploadedParts.length >= session.totalParts) await complete();
+    // ensures state survives app restarts.
+    if (cancelled) {
+      session = { ...session, status: 'CANCELLED' };
+      persistController.persist(session);
+      updateStatus('CANCELLED');
+    } else if (paused) {
+      session = { ...session, status: 'PAUSED' };
+      persistController.persist(session);
+      updateStatus('PAUSED');
+    } else if (session.uploadedParts.length >= session.totalParts) {
+      await complete();
+    }
   };
 
   // ── Complete ───────────────────────────────────────────────────────────
@@ -507,7 +669,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
       uploadStorage.removeSession();
     }
-    if (stored) uploadStorage.removeSession();
+
 
     paused = false; cancelled = false; highestProgress = 0;
     etagBatch = []; etagTimer = null; lastProgressEmit = 0;
@@ -542,6 +704,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     // force -> because a brand new session must always be saved immediately.
     persistController.persist(session, true);
 
+    setupNetworkListener();
     updateStatus('INITIATED');
     await processQueue();
   };
@@ -550,7 +713,15 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     const stored = uploadStorage.getSession();
     if (!stored) throw new Error('No session');
 
+
     session = stored; paused = false; cancelled = false;
+
+    // check mark
+    if (session.status === "WAITING_FOR_NETWORK") {
+      log("Resume", "Resuming after network recovery");
+    }
+
+    setupNetworkListener();
     highestProgress = 0; etagBatch = []; etagTimer = null; lastProgressEmit = 0;
     partState.clear(); activeWorkers.clear(); chunkCache.clear();
     persistController.reset();
@@ -601,18 +772,28 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     log('Pause', `${session.uploadedParts.length}/${session.totalParts} done`);
   };
 
+
+
+
+
   const cancel = async () => {
     cancelled = true; paused = false;
+    unsubscribeNetInfo?.();
+    unsubscribeNetInfo = null;
     activeWorkers.forEach(w => w.cancel());
     activeWorkers.clear();
     partState.clear();
 
-    const entries = Array.from(chunkCache.entries());
-    for (const [n, promise] of entries) {
+
+    for (const promise of chunkCache.values()) {
       try {
         const path = await promise;
-        if (typeof path === 'string') await deleteChunkFile(path);
-      } catch { /* ignore */ }
+        if (typeof path === 'string') {
+          await deleteChunkFile(path);
+        }
+      } catch {
+        // ignore
+      }
     }
     chunkCache.clear();
 

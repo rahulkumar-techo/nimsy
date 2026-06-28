@@ -7,12 +7,14 @@ export type UploadStatus =
   | "IDLE"
   | "INITIALIZING"
   | "INITIATED"
+  |"PREPARING_UPLOAD"
   | "UPLOADING"
   | "PAUSED"
   | "COMPLETING"
   | "COMPLETED"
   | "FAILED"
   | "CANCELLED"
+  |"WAITING_FOR_NETWORK"
 
 export type Visibility = "PUBLIC" | "PRIVATE" | "UNLISTED";
 export type ThumbnailType = "image/png" | "image/jpeg";

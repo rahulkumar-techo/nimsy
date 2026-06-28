@@ -27,15 +27,17 @@ const STATUS_CONFIG: Record<UploadStatus, {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
 }> = {
-  IDLE:         { label: "Ready",              icon: "cloud-outline",        color: "#6B7280" },
-  INITIALIZING: { label: "Preparing upload",   icon: "cloud-upload-outline", color: "#3B82F6" },
-  INITIATED:    { label: "Starting upload",    icon: "cloud-upload-outline", color: "#3B82F6" },
-  UPLOADING:    { label: "Uploading video",    icon: "cloud-upload-outline", color: "#3B82F6" },
-  PAUSED:       { label: "Upload paused",      icon: "pause-circle-outline", color: "#F59E0B" },
-  COMPLETING:   { label: "Finalizing",         icon: "sync-outline",         color: "#8B5CF6" },
-  COMPLETED:    { label: "Upload complete",    icon: "checkmark-circle",     color: "#22C55E" },
-  FAILED:       { label: "Upload failed",      icon: "alert-circle",         color: "#EF4444" },
-  CANCELLED:    { label: "Upload cancelled",   icon: "close-circle-outline", color: "#6B7280" },
+  IDLE:                { label: "Ready",                icon: "cloud-outline",          color: "#6B7280" },
+  INITIALIZING:        { label: "Preparing upload",     icon: "cloud-upload-outline",   color: "#3B82F6" },
+  INITIATED:           { label: "Starting upload",      icon: "cloud-upload-outline",   color: "#3B82F6" },
+  PREPARING_UPLOAD:    { label: "Preparing upload",     icon: "cloud-upload-outline",   color: "#3B82F6" },
+  UPLOADING:           { label: "Uploading video",      icon: "cloud-upload-outline",   color: "#3B82F6" },
+  PAUSED:              { label: "Upload paused",        icon: "pause-circle-outline",   color: "#F59E0B" },
+  WAITING_FOR_NETWORK: { label: "Waiting for internet", icon: "cloud-offline-outline",  color: "#F59E0B" },
+  COMPLETING:          { label: "Finalizing",           icon: "sync-outline",           color: "#8B5CF6" },
+  COMPLETED:           { label: "Upload complete",        icon: "checkmark-circle",       color: "#22C55E" },
+  FAILED:              { label: "Upload failed",          icon: "alert-circle",           color: "#EF4444" },
+  CANCELLED:           { label: "Upload cancelled",     icon: "close-circle-outline",   color: "#6B7280" },
 };
 
 const COLORS = {
@@ -117,12 +119,6 @@ export default function UploadProgressScreen() {
   const ui: UploadUIState = useSelector((state: RootState) => state.uploadUI);
   const { cancelUpload } = useUpload();
 
-  //  // Auto-pause on background, resume on foreground
-  // useAppStateUploadHandler({
-  //   enabled: true,
-  //   onPause: () => console.log("[AppState] Upload paused — app backgrounded"),
-  //   onResume: () => console.log("[AppState] Upload resumed — app active"),
-  // });
   const {
     progress,
     uploadedBytes,
@@ -141,12 +137,11 @@ export default function UploadProgressScreen() {
   const isFinalizing = status === "COMPLETING";
   const isFailed = status === "FAILED";
   const isDone = status === "COMPLETED";
-  // FIX: Don't show "0% uploading" during INITIALIZING/INITIATED
-  // Only show progress bar when actually UPLOADING or later
-  const showProgress = status === "UPLOADING" || status === "PAUSED" || status === "COMPLETING";
+  const isWaitingForNetwork = status === "WAITING_FOR_NETWORK";
+  const showProgress = status === "UPLOADING" || status === "PAUSED" || status === "WAITING_FOR_NETWORK" || status === "COMPLETING";
   const isActive = status === "UPLOADING";
-  const isPreparing = status === "INITIALIZING" || status === "INITIATED";
-  const isCancellable = showProgress || isPreparing ;
+  const isPreparing = status === "INITIALIZING" || status === "INITIATED" || status === "PREPARING_UPLOAD";
+  const isCancellable = showProgress || isPreparing || isWaitingForNetwork;
 
   const remainingBytes = Math.max((totalBytes || 0) - (uploadedBytes || 0), 0);
 
@@ -156,7 +151,7 @@ export default function UploadProgressScreen() {
 
   // Breathing pulse while actively uploading
   useEffect(() => {
-    if (!isActive) {
+    if (!isActive || isWaitingForNetwork) {
       pulse.setValue(1);
       return;
     }
@@ -168,7 +163,7 @@ export default function UploadProgressScreen() {
     );
     loop.start();
     return () => loop.stop();
-  }, [isActive, pulse]);
+  }, [isActive, isWaitingForNetwork, pulse]);
 
   // Spin while finalizing
   useEffect(() => {
@@ -230,14 +225,14 @@ export default function UploadProgressScreen() {
         </Text>
       )}
 
-      {/* ── Big Percentage (only when actually uploading) ── */}
+      {/* ── Big Percentage (only when actually uploading or waiting for network) ── */}
       {showProgress && (
         <Text style={{ color: config.color, fontSize: 48, fontWeight: "800", marginTop: 8 }}>
           {Math.round(safeProgress)}%
         </Text>
       )}
 
-      {/* ── Progress Bar (only when actually uploading) ── */}
+      {/* ── Progress Bar (only when actually uploading or waiting for network) ── */}
       {showProgress && (
         <View style={{ width: "100%", marginTop: 24 }}>
           <View
@@ -271,7 +266,7 @@ export default function UploadProgressScreen() {
         </View>
       )}
 
-      {/* ── Bytes Detail (only when actually uploading) ── */}
+      {/* ── Bytes Detail (only when actually uploading or waiting for network) ── */}
       {showProgress && (
         <View
           style={{
@@ -290,7 +285,7 @@ export default function UploadProgressScreen() {
         </View>
       )}
 
-      {/* ── Chunk Info (only when actually uploading) ── */}
+      {/* ── Chunk Info (only when actually uploading or waiting for network) ── */}
       {showProgress && totalParts > 0 && (
         <View
           style={{
@@ -315,14 +310,23 @@ export default function UploadProgressScreen() {
         </View>
       )}
 
-      {/* ── Chunk Dots (only when actually uploading) ── */}
-      {isActive && totalParts > 0 && (
+      {/* ── Chunk Dots (when actively uploading or waiting for network) ── */}
+      {(isActive || isWaitingForNetwork) && totalParts > 0 && (
         <View style={{ marginTop: 16 }}>
           <ChunkDots
             completedParts={completedParts}
             activeParts={activeParts}
             totalParts={totalParts}
           />
+        </View>
+      )}
+
+      {/* ── Network Interruption ── */}
+      {isWaitingForNetwork && (
+        <View className="mt-4 items-center px-6 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25 max-w-xs">
+          <Ionicons name="cloud-offline-outline" size={20} color="#F59E0B" className="mb-1.5" />
+          <Text className="text-amber-500 text-sm font-semibold text-center">Internet connection lost.</Text>
+          <Text className="text-amber-500/80 text-xs text-center mt-1">Upload will automatically resume when the connection returns.</Text>
         </View>
       )}
 
@@ -344,7 +348,7 @@ export default function UploadProgressScreen() {
           <StatCard
             label="Uploading"
             value={formatBytes(inFlightBytes)}
-            color={COLORS.inFlight}
+            color={isWaitingForNetwork ? COLORS.textMuted : COLORS.inFlight}
           />
           <StatCard
             label="Pending"
