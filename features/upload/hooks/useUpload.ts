@@ -1,10 +1,10 @@
+import { RootState } from "@/store/store";
 import { useCallback, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "@/store/store";
-import { setProgress, setProgressDetail, setStatus, setError, setVideoId, resetUploadProgress } from "../store/upload.slice";
 import { createUploadManager } from "../core/createUploadManager";
-import { StartUploadParams, UploadStatus, ProgressUpdate } from "../types/upload.types";
-import { UploadNotificationService } from "../service/notification.service";
+import { UploadNotificationService } from "../services/notification.service";
+import { resetUploadProgress, setError, setProgress, setProgressDetail, setStatus, setVideoId } from "../store/upload.slice";
+import { ProgressUpdate, StartUploadParams, UploadStatus } from "../types/upload.types";
 
 let globalManager: ReturnType<typeof createUploadManager> | null = null;
 let isStarting = false;

@@ -11,16 +11,23 @@
  * 4. XMLHttpRequest.send(Uint8Array) — standard upload (reliable)
  */
 
-import { UploadWorker } from '../service/upload.worker';
-import { uploadApi } from '../services/upload.api';
+import ReactNativeBlobUtil from 'react-native-blob-util';
+import { uploadApi } from '../api/upload.api';
+import { UploadNotificationService } from '../services/notification.service';
+import { UploadWorker } from '../services/upload.worker';
 import * as uploadStorage from '../storage/upload.storage';
 import {
-  StartUploadParams, UploadSession, UploadStatus, PresignedPart,
-  UploadedPart, UploadCallbacks, ProgressUpdate,
+  PresignedPart,
+  ProgressUpdate,
+  StartUploadParams,
+  UploadCallbacks,
+  UploadedPart,
+  UploadSession, UploadStatus,
 } from '../types/upload.types';
-import { UploadNotificationService } from '../service/notification.service';
+import { ChunkIntegrity } from '../utils/chunk/chunk-integrity.util';
 import { uploadThumbnail } from '../utils/uploadThumbnail';
-import ReactNativeBlobUtil from 'react-native-blob-util';
+import { ConcurrencyController } from './manager/concurrency.controller';
+import { PersistController } from './manager/persist';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DEBUG
@@ -34,10 +41,12 @@ const err = (s: string, ...a: unknown[]) => { console.error(`[UM][${s}]`, ...a);
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════════════════
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000] as const;
-const CONCURRENCY = { BASE: 4, LOW_END: 2 };
+const CONCURRENCY = { BASE: 3, LOW_END: 2 };
 const ETAG_BATCH_SIZE = 5;
 const ETAG_FLUSH_MS = 2000;
 const PROGRESS_THROTTLE_MS = 200;
+
+
 
 const CHUNK_CACHE_DIR = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/upload-chunks/`;
 
@@ -111,6 +120,7 @@ async function deleteChunkFile(filePath: string): Promise<void> {
       log('DeleteChunk', `deleted ${cleanPath.split('/').pop()}`);
     }
   } catch (e) {
+
     warn('DeleteChunk', `failed: ${(e as Error).message}`);
   }
 }
@@ -121,7 +131,7 @@ async function cleanupChunks(uploadId: string): Promise<void> {
     const pattern = new RegExp(`^${uploadId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-part-\\d+\.tmp$`);
     for (const file of files) {
       if (pattern.test(file)) {
-        await ReactNativeBlobUtil.fs.unlink(`${CHUNK_CACHE_DIR}${file}`).catch(() => {});
+        await ReactNativeBlobUtil.fs.unlink(`${CHUNK_CACHE_DIR}${file}`).catch(() => { });
       }
     }
   } catch { /* ignore */ }
@@ -143,6 +153,9 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   >();
 
   const chunkCache = new Map<number, Promise<string>>();
+  const persistController = new PersistController({ intervalMs: 5000, batchSize: 5, });
+
+
 
   let highestProgress = 0;
   let etagBatch: UploadedPart[] = [];
@@ -151,12 +164,12 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   let lastProgressEmit = 0;
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  const persist = () => {
-    if (!session) return;
-    session = { ...session, updatedAt: Date.now() };
-    uploadStorage.saveSession(session);
-    log('Persist', `${session.status} | ${session.uploadedParts.length}/${session.totalParts}`);
-  };
+  /* const persist = () => {
+     if (!session) return;
+     session = { ...session, updatedAt: Date.now() };
+     uploadStorage.saveSession(session);
+     log('Persist', `${session.status} | ${session.uploadedParts.length}/${session.totalParts}`);
+   };*/
 
   const updateStatus = (s: UploadStatus) => {
     log('Status', s);
@@ -194,6 +207,55 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     highestProgress = clamped;
     callbacks?.onProgress?.({ ...calcProgress(), progress: clamped });
   };
+
+  /**
+ * Returns a valid chunk file. Reuses cached chunk if possible and recreates corrupted chunks.
+ */
+  const resolveChunk = async (partNumber: number, startByte: number, endByte: number): Promise<string> => {
+    if (!session) throw new Error("No session");
+    const expectedSize = endByte - startByte;
+
+    let pathPromise = chunkCache.get(partNumber);
+    if (!pathPromise) {
+      pathPromise = createChunkFile(session.fileUri, session.uploadId, partNumber, startByte, endByte);
+      chunkCache.set(partNumber, pathPromise);
+    }
+    let chunkPath = await pathPromise;
+
+    const valid = await ChunkIntegrity.validate(chunkPath, expectedSize);
+    if (!valid) {
+      log("Integrity", `part=${partNumber} invalid, recreating`);
+      await deleteChunkFile(chunkPath);
+
+      chunkPath = await createChunkFile(session.fileUri, session.uploadId, partNumber, startByte, endByte);
+      chunkCache.set(partNumber, Promise.resolve(chunkPath));
+
+      // validate recreated chunk
+      const recreatedValid = await ChunkIntegrity.validate(chunkPath, expectedSize);
+      if (!recreatedValid) throw new Error(`Failed to create valid chunk for part ${partNumber}`);
+    }
+    return chunkPath;
+  };
+
+  /**
+   * Refreshes expired presigned URL.
+   */
+  const refreshChunkUrl = async (partNumber: number): Promise<string> => {
+    if (!session) throw new Error("No session");
+    if (paused || cancelled) throw new Error("AbortError");
+
+    log("UploadChunk", `part=${partNumber} refreshing URL`);
+    const refreshed = await uploadApi.singleChunk({ uploadId: session.uploadId, key: session.key, partNumbers: [partNumber] });
+    if (paused || cancelled) throw new Error("AbortError");
+
+    const url = refreshed.parts[0].url;
+    session.presignedUrls = session.presignedUrls.map(p => p.partNumber === partNumber ? { ...p, url } : p);
+    persistController.persist(session, true);
+
+    return url;
+  };
+
+  // <------------------------------------Helper end-------------------------------------------------->
 
   // ── Part State ───────────────────────────────────────────────────────────
   const initPartState = (totalParts: number, fileSize: number, chunkSize: number) => {
@@ -260,67 +322,57 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     etagBatch.push({ partNumber: n, etag });
     if (etagBatch.length >= ETAG_BATCH_SIZE) {
       if (etagTimer) clearTimeout(etagTimer);
-      flushEtags().catch(() => {});
+      flushEtags().catch(() => { });
       return;
     }
     if (etagTimer) clearTimeout(etagTimer);
-    etagTimer = setTimeout(() => flushEtags().catch(() => {}), ETAG_FLUSH_MS);
+    etagTimer = setTimeout(() => flushEtags().catch(() => { }), ETAG_FLUSH_MS);
   };
 
   // ── Upload Chunk ─────────────────────────────────────────────────────────
-  const uploadChunk = async (task: { part: PresignedPart; startByte: number; endByte: number }) => {
-    if (!session) throw new Error('No session');
-    const n = task.part.partNumber;
-    let chunkPath: string | null = null;
-    let etag: string | null = null;
+  const uploadChunk = async (task: { part: PresignedPart; startByte: number; endByte: number }): Promise<string> => {
+    if (!session) throw new Error("No session");
 
-    log('UploadChunk', `part=${n}, range=[${task.startByte}-${task.endByte}]`);
+    const partNumber = task.part.partNumber;
+    let currentUrl = task.part.url, chunkPath: string | null = null;
 
-    try {
-      // 1. Create chunk file (native slice)
-      let pathPromise = chunkCache.get(n);
-      if (!pathPromise) {
-        pathPromise = createChunkFile(session.fileUri, session.uploadId, n, task.startByte, task.endByte);
-        chunkCache.set(n, pathPromise);
-      }
-      chunkPath = await pathPromise;
+    log("UploadChunk", `part=${partNumber}, range=[${task.startByte}-${task.endByte}]`);
 
-      // 2. Upload via worker (reads file, converts to Uint8Array, uploads via XHR)
-      const worker = new UploadWorker(
-        [{
-          partNumber: n,
-          fileUri: chunkPath,
-          url: task.part.url,
-        }],
-        {
-          onChunkProgress: ({ uploadedBytes }) => {
-            setUploading(n, uploadedBytes);
-            emitProgress();
-          },
-          onChunkComplete: (_, e) => {
-            etag = e;
-            log('UploadChunk', `part=${n} done, etag=${e.slice(0, 8)}...`);
-          },
-          onChunkError: (_, e) => {
-            setPending(n);
-            warn('UploadChunk', `part=${n} err: ${e.message}`);
-          },
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let uploadSucceeded = false;
+      try {
+        chunkPath = await resolveChunk(partNumber, task.startByte, task.endByte);
+        let etag: string | null = null;
+
+        const worker = new UploadWorker([{ partNumber, fileUri: chunkPath, url: currentUrl, mimeType: session.mimeType }], {
+          onChunkProgress: ({ uploadedBytes }) => { setUploading(partNumber, uploadedBytes); emitProgress(); },
+          onChunkComplete: (_, e) => { etag = e; log("UploadChunk", `part=${partNumber} uploaded`); },
+          onChunkError: (_, e) => { setPending(partNumber); warn("UploadChunk", `part=${partNumber} failed: ${e.message}`); }
+        });
+
+        activeWorkers.set(partNumber, worker);
+        await worker.run();
+
+        if (!etag) throw new Error(`Missing ETag for part ${partNumber}`);
+        uploadSucceeded = true;
+        return etag;
+
+      } catch (error: any) {
+        const isExpired = ["HTTP 403", "SignatureDoesNotMatch", "Request has expired", "ExpiredToken"].some(msg => error.message?.includes(msg));
+        if (isExpired && attempt === 0) {
+          currentUrl = await refreshChunkUrl(partNumber);
+          continue;
         }
-      );
-
-      activeWorkers.set(n, worker);
-      await worker.run();
-
-      if (!etag) throw new Error('No ETag');
-      return etag;
-
-    } finally {
-      activeWorkers.delete(n);
-      chunkCache.delete(n);
-      if (chunkPath) {
-        await deleteChunkFile(chunkPath);
+        throw error;
+      } finally {
+        activeWorkers.delete(partNumber);
+        if (chunkPath && (uploadSucceeded || attempt === 1)) {
+          chunkCache.delete(partNumber);
+          await deleteChunkFile(chunkPath);
+        }
       }
     }
+    throw new Error(`Part ${partNumber} failed`);
   };
 
   // ── Handlers ───────────────────────────────────────────────────────────
@@ -329,7 +381,9 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     if (session.uploadedParts.some(p => p.partNumber === n)) return;
     setCompleted(n, etag);
     session = { ...session, uploadedParts: [...session.uploadedParts, { partNumber: n, etag }] };
-    persist();
+    // no Force -> this is exactly where throttled persistence is useful.
+    persistController.persist(session);
+
     queueEtag(n, etag);
     emitProgress(true);
   };
@@ -337,7 +391,11 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
   const onFail = (error: unknown) => {
     if (error instanceof Error && error.name === 'AbortError') return;
     err('OnFail', error);
-    if (session) { session = { ...session, status: 'FAILED' }; persist(); }
+    if (session) {
+      session = { ...session, status: 'FAILED' };
+      // force -> because a brand new session must always be saved immediately.
+      persistController.persist(session, true);
+    }
     updateStatus('FAILED');
     callbacks?.onError?.(error instanceof Error ? error : new Error(String(error)));
     UploadNotificationService.showFailed();
@@ -345,6 +403,8 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
   // ── Worker Loop ──────────────────────────────────────────────────────────
   const processQueue = async () => {
+    const concurrency = await ConcurrencyController.getOptimal();
+
     if (!session) return;
     if (session.uploadedParts.length >= session.totalParts) { await complete(); return; }
 
@@ -352,12 +412,12 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     const sharedQueue = [...queue];
 
     session = { ...session, status: 'UPLOADING' };
-    persist();
+    persistController.persist(session);
     updateStatus('UPLOADING');
     UploadNotificationService.showProgress(0);
 
-    const concurrency = getConcurrency();
-    log('ProcessQueue', `${concurrency} workers, ${sharedQueue.length} tasks`);
+    // const concurrency = getConcurrency();
+    log('ProcessQueue', `${concurrency.workers} workers, ${sharedQueue.length} tasks reason ${concurrency.reason}`);
 
     const workerLoop = async () => {
       while (!paused && !cancelled) {
@@ -366,7 +426,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
         log('WorkerLoop', `dequeued part=${task.part.partNumber}, ${sharedQueue.length} remaining`);
         try {
           const etag = await retry(() => uploadChunk(task));
-          onSuccess(task.part.partNumber, etag);
+          onSuccess(task.part.partNumber, etag!);
         } catch (e) {
           onFail(e);
           return;
@@ -374,7 +434,7 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       }
     };
 
-    await Promise.all(Array.from({ length: concurrency }, () => workerLoop()));
+    await Promise.all(Array.from({ length: concurrency.workers }, () => workerLoop()));
 
     if (etagTimer) clearTimeout(etagTimer);
     await flushEtags();
@@ -393,7 +453,9 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     await cleanupChunks(session.uploadId);
 
     session = { ...session, status: 'COMPLETING' };
-    persist();
+    // force -> because a brand new session must always be saved immediately.
+    persistController.persist(session, true);
+
     updateStatus('COMPLETING');
     log('Complete', 'finalizing...');
 
@@ -408,7 +470,8 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
       }
 
       session = { ...session, status: 'COMPLETED' };
-      persist();
+      // force -> because a brand new session must always be saved immediately.
+      persistController.persist(session, true);
       uploadStorage.removeSession();
       updateStatus('COMPLETED');
       highestProgress = 100;
@@ -421,7 +484,8 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
     } catch (e) {
       err('Complete', 'failed:', e);
       session = { ...session, status: 'FAILED' };
-      persist();
+      persistController.persist(session);
+      ;
       callbacks?.onError?.(e instanceof Error ? e : new Error(String(e)));
       UploadNotificationService.showFailed();
     } finally {
@@ -431,22 +495,23 @@ export function createUploadManager(callbacks?: UploadCallbacks) {
 
   // ── Public API ─────────────────────────────────────────────────────────
   const start = async (params: StartUploadParams) => {
- const stored = uploadStorage.getSession();
+    const stored = uploadStorage.getSession();
 
-if (stored) {
-  // If manager already exists, resume should be used instead
-  // Since we are starting a fresh upload, wipe stale session.
-  console.warn(
-    "[UploadManager] Removing stale upload session:",
-    stored.status
-  );
+    if (stored) {
+      // If manager already exists, resume should be used instead
+      // Since we are starting a fresh upload, wipe stale session.
+      console.warn(
+        "[UploadManager] Removing stale upload session:",
+        stored.status
+      );
 
-  uploadStorage.removeSession();
-}
+      uploadStorage.removeSession();
+    }
     if (stored) uploadStorage.removeSession();
 
     paused = false; cancelled = false; highestProgress = 0;
     etagBatch = []; etagTimer = null; lastProgressEmit = 0;
+    persistController.reset();
     partState.clear(); activeWorkers.clear(); chunkCache.clear();
 
     updateStatus('INITIALIZING');
@@ -474,7 +539,9 @@ if (stored) {
     };
 
     initPartState(res.totalChunks, params.fileSize, res.chunkSize);
-    persist();
+    // force -> because a brand new session must always be saved immediately.
+    persistController.persist(session, true);
+
     updateStatus('INITIATED');
     await processQueue();
   };
@@ -486,6 +553,7 @@ if (stored) {
     session = stored; paused = false; cancelled = false;
     highestProgress = 0; etagBatch = []; etagTimer = null; lastProgressEmit = 0;
     partState.clear(); activeWorkers.clear(); chunkCache.clear();
+    persistController.reset();
 
     updateStatus('INITIALIZING');
     log('Resume', `videoId=${stored.videoId}`);
@@ -514,7 +582,8 @@ if (stored) {
       } catch { /* use existing */ }
     }
 
-    persist();
+    // force -> because a brand new session must always be saved immediately.
+    persistController.persist(session, true);
     await processQueue();
   };
 
@@ -525,7 +594,9 @@ if (stored) {
     activeWorkers.clear();
     for (const [n, s] of partState.entries()) if (s.status === 'UPLOADING') setPending(n);
     session = { ...session, status: 'PAUSED' };
-    persist();
+
+    // force -> because a brand new session must always be saved immediately.
+    persistController.persist(session, true);
     updateStatus('PAUSED');
     log('Pause', `${session.uploadedParts.length}/${session.totalParts} done`);
   };
@@ -568,3 +639,22 @@ if (stored) {
 
   return { start, resume, pause, cancel };
 }
+
+/*
+Chunk uploaded successfully
+    ↓
+persist(session)         // throttled
+
+Upload started
+Upload resumed
+Upload paused
+Upload failed
+Upload completed
+Upload entering COMPLETING state
+    ↓
+persist(session, true)   // immediate save
+
+New upload starts/resumes
+    ↓
+reset()
+*/ 

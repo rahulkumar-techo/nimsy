@@ -8,14 +8,19 @@ RNBlobUtil Android bug with chunk temp files.
 --
 always take care 
 Content-Type/signature mismatch.
-*/ 
+*/
 
 import ReactNativeBlobUtil from "react-native-blob-util";
 
 const DEBUG = typeof __DEV__ !== "undefined" && __DEV__;
 const log = (s: string, ...a: unknown[]) => DEBUG && console.log(`[UW][${s}]`, ...a);
 
-export interface UploadTask { partNumber: number; fileUri: string; url: string; }
+export interface UploadTask {
+  partNumber: number;
+  fileUri: string;
+  url: string;
+  mimeType: string;
+}
 export interface ChunkProgressEvent { partNumber: number; uploadedBytes: number; totalBytes: number; }
 export interface UploadWorkerCallbacks {
   onChunkProgress?: (e: ChunkProgressEvent) => void;
@@ -27,7 +32,7 @@ export class UploadWorker {
   private requestTask: any = null;
   private cancelled = false;
 
-  constructor(private tasks: UploadTask[], private callbacks?: UploadWorkerCallbacks) {}
+  constructor(private tasks: UploadTask[], private callbacks?: UploadWorkerCallbacks) { }
 
   async run(): Promise<void> {
     for (const task of this.tasks) {
@@ -38,18 +43,57 @@ export class UploadWorker {
 
   cancel() {
     this.cancelled = true;
-    try { this.requestTask?.cancel(); } catch {}
+    try { this.requestTask?.cancel(); } catch { }
   }
 
   private async upload(task: UploadTask): Promise<void> {
-    const { partNumber, fileUri, url } = task;
+    const { partNumber, fileUri, url, mimeType } = task;
     const cleanPath = fileUri.replace(/^file:\/\//, "");
     log("Upload", `part=${partNumber}`, cleanPath);
 
     try {
-      this.requestTask = ReactNativeBlobUtil.fetch("PUT", url, 
-        { "Content-Type": "application/octet-stream" }, 
-        ReactNativeBlobUtil.wrap(cleanPath)
+      const exists = await ReactNativeBlobUtil.fs.exists(cleanPath);
+
+      if (!exists) {
+        throw new Error(`Chunk file missing: ${cleanPath}`);
+      }
+
+      const stat = await ReactNativeBlobUtil.fs.stat(cleanPath);
+
+      log(
+        "Chunk",
+        `part=${partNumber}`,
+        `path=${cleanPath}`
+      );
+
+      log(
+        "Chunk",
+        `part=${partNumber}`,
+        `size=${(Number(stat.size) / (1024 * 1024)).toFixed(2)} MB`
+      );
+
+      log(
+        "Chunk",
+        `part=${partNumber}`,
+        `exists=${exists}`
+      );
+
+      if (Number(stat.size) <= 0) {
+        throw new Error(`Chunk file empty: ${cleanPath}`);
+      }
+
+      const nativeBodyPayload =
+        ReactNativeBlobUtil.wrap(cleanPath);
+
+      // 3. Perform upload with optimized native stream
+      this.requestTask = ReactNativeBlobUtil.fetch(
+        "PUT",
+        url,
+        {
+          "Content-Type": mimeType || "application/octet-stream",
+          "Content-Length": String(stat.size)
+        },
+        nativeBodyPayload
       );
 
       this.requestTask.uploadProgress({ interval: 250 }, (written: number, total: number) => {
@@ -58,7 +102,10 @@ export class UploadWorker {
 
       const resp = await this.requestTask;
       const status = resp.info().status;
-      if (status < 200 || status >= 300) throw new Error(`HTTP ${status}`);
+      if (status < 200 || status >= 300) {
+        const body = await resp.text().catch(() => "");
+        throw new Error(`HTTP ${status}: ${body}`);
+      }
 
       const headers = resp.info().headers;
       const etag = headers?.ETag || headers?.etag || headers?.Etag;
